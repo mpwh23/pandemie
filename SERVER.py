@@ -8,9 +8,11 @@ import traceback
 import urllib.request
 import random
 import tkinter as tk
+from tkinter import ttk
 from tkinter import *
 from threading import Thread
 import math
+import time  # TODO remove
 
 from Pandemie import libserver
 
@@ -64,7 +66,7 @@ class Server(Thread):
 
         # region gamevariables #########################################################################################
         self.serverversion = 0
-        self.game_status = "INIT"
+        self.game_STATE = "INIT"
         self.player_name = ["", "", "", ""]
         self.player_role = [0, 0, 0, 0]
         self.player_rdy = [0, 0, 0, 0]
@@ -78,9 +80,9 @@ class Server(Thread):
         self.outbreak = 0
         self.inflvl = 0
         self.newinfection = [2, 2, 2, 3, 3, 4]
-        self.healing = [0, 0, 0, 0]         # 0 = active,  1 = healed,  2 = exterminated
+        self.healing = [0, 1, 0, 2]         # 0 = active,  1 = healed,  2 = exterminated
 
-        self.center = 5  # one in Atlanta + 5 => 6
+        # self.center = 5  # one in Atlanta + 5 => 6
 
         # Spielerkarten:
         # back:  back_c1.png
@@ -240,9 +242,15 @@ class Server(Thread):
             "recon":            self.recon_player,      # reconnect Player
             "get_update":       self.get_update,        # Main Game
             "player_move":      self.player_move,       # Main Game
-            "draw_card":        self.deal_card,         # Main Game
-            "get_infection":    self.deal_infection,
+            "draw_playercard":  self.deal_player,       # Main Game
+            "draw_infcard":     self.deal_infection,
+            "draw_epidemiecard":self.deal_epidemie,
+
+            "center":           self.modify_center,
             "update_cards":     self.update_cards,
+            "update_inf":       self.update_infection,
+            "turn_over":        self.set_next_player,
+
         }
         # Get the function from switcher dictionary
         func = switcher.get(argument.get("action"), lambda: None)
@@ -266,7 +274,7 @@ class Server(Thread):
                    "player":        self.player_name,
                    "player_role":   self.player_role,
                    "player_rdy":    self.player_rdy,
-                   "state":         self.game_status
+                   "state":         self.game_STATE
                    }
         return content
 
@@ -295,6 +303,23 @@ class Server(Thread):
                    }
         return content
 
+    def set_next_player(self):
+        self.serverversion += 1
+
+        n = 0
+        while n < len(self.player_name):
+            if self.player_name[n] != "":
+                n = n + 1
+            else:
+                break
+        self.current_player = (self.request.get("value") + 1) % n
+
+        content = {"response": "next_player",
+                   "v": self.serverversion,
+                   "cur_player": self.current_player,
+                   }
+        return content
+
     def player_is_rdy(self):
         p = self.request.get("value")
         print("Player " + str(p) + " is ready")
@@ -305,7 +330,7 @@ class Server(Thread):
         content = {"response": "recon",
                    "player": self.player_name,
                    "player_role": self.player_role,
-                   "state": self.game_status
+                   "state": self.game_STATE
                    }
         return content
 
@@ -337,9 +362,6 @@ class Server(Thread):
         for p in self.player_name:
             if p != "":
                 player_count += 1
-
-        # todo del comment
-        #player_count = 3  # TODO  TEMP !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         # prepare player draw cards
         # lvl = 1: easy   -> 4 epidemie cards
@@ -388,7 +410,7 @@ class Server(Thread):
             for c in range(0, len(piles)):
                 self.cardpile_player.append(piles[c])
 
-        self.game_status = "START_GAME"
+        self.game_STATE = "GAME"
         self.serverversion += 1
         print("START GAME")
 
@@ -418,7 +440,7 @@ class Server(Thread):
         # todo do stuff
         return self.get_update()
 
-    def deal_card(self):
+    def deal_player(self):
         self.serverversion += 1
         # val = self.request.get("value")
         if len(self.cardpile_player) > 1:       # check pile
@@ -430,32 +452,115 @@ class Server(Thread):
                        }
             return content
         else:  # last card is drawn -> YOU LOSE -----------------------------------------------
-            self.game_status = "LOSE"
+            self.game_STATE = "LOSE_GAME"
             return self.get_update()
 
     def deal_infection(self):
         self.serverversion += 1
         new_card = []
         num = self.newinfection[self.inflvl] if self.inflvl < 6 else 4
-        print(num)
+
         for c in range(0, num):
             new_card.append(self.cardpile_infection[0])
-            self.carddisposal_infection.append(self.cardpile_infection[0])
+            # self.carddisposal_infection.append(self.cardpile_infection[0])
             del self.cardpile_infection[0]
         content = {"response": "new_cards",
                    "new_inf": new_card
                    }
         return content
 
+    def deal_epidemie(self):
+        self.serverversion += 1
+        # increase infection lvl
+        self.inflvl += 1
+
+        # draw lowest card
+        new_card = [self.cardpile_infection[len(self.cardpile_infection) - 1]]
+        self.carddisposal_infection.append(self.cardpile_infection[len(self.cardpile_infection) - 1])
+        del self.cardpile_infection[len(self.cardpile_infection) - 1]
+
+        content = {"response": "new_cards",
+                   "new_epi": new_card
+                   }
+        return content
+
+        #   if seuche not extinct + 3 in city
+        #   check outbreak
+        #   check supplies -> lose
+        # karten mischen und zurücklegen
+
     def update_cards(self):
-        # self.serverversion += 1
+        self.serverversion += 1
         update = self.request.get("value")
-        self.player_cards[update.get('player')] = update.get('cards')
+
+        for c in update.get('remove'):
+            self.player_cards[update.get('player')].remove(c)
+            self.carddisposal_player.append(c)
+
+        for c in update.get('add'):
+            self.player_cards[update.get('player')].append(c)
+
+        for c in update.get('switch'):
+            for i, pc in enumerate(self.player_cards[update.get('player')]):
+                if pc == c[0]:
+                    self.carddisposal_player.append(pc)
+                    self.player_cards[update.get('player')][i] = c[1]
+
         for c in update.get('burn'):
             self.carddisposal_player.append(c)
+
         return self.get_version()
 
+    def update_infection(self):
+        self.serverversion += 1
+        value = self.request.get("value")
 
+        card = value.get("card")
+        color = self.city[card]['farbe']
+
+        if self.healing[color] != 2:  # check if extinct
+            infected = []
+            inf = [card]
+
+            while len(inf) > 0:
+                if inf[0] not in infected:
+                    if self.city[inf[0]]['i' + str(color)] < 3:
+                        self.city[inf[0]]['i' + str(color)] += 1
+                        if self.infection[color] > 0:
+                            self.infection[color] -= 1
+                        else:
+                            # -> YOU LOSE -----------------------------------------------
+                            self.game_STATE = "LOSE_GAME"
+                        infected.append(inf[0])
+                    else:  # outbreak
+                        self.outbreak += 1
+                        if self.outbreak >= 8:
+                            # -> YOU LOSE -----------------------------------------------
+                            self.game_STATE = "LOSE_GAME"
+
+                        for o in self.city[inf[0]].get("con"):
+                            inf.append(o)
+                del inf[0]
+
+        self.carddisposal_infection.append(card)
+
+        return self.get_update()
+
+
+
+    def modify_center(self):
+        self.serverversion += 1
+        update = self.request.get("value")
+        # 'player': self.this_player_num,
+        # 'center_new': pos,
+        # 'center_removed': None,
+        # 'usedcards': []}
+        self.city[update.get('center_new')]['center'] = 1
+        if update.get('center_removed') is not None:
+            self.city[update.get('center_removed')]['center'] = 0
+        self.player_cards[update.get('player')] = update.get('cards')
+
+        return self.get_version()
     # endregion
 
     # region mainloop ##################################################################################################
@@ -496,7 +601,7 @@ class ServerInterface(tk.Tk):
         tk.Tk.__init__(self)
 
         self.title("Pandemie | Server")
-        self.geometry("150x300")
+        self.geometry("150x320+600+1")
 
         self.lblstatus = Label(self, text="Status", font="Helvetica 12")
         self.lblstatus.pack(fill=X, pady=10)
@@ -528,10 +633,16 @@ class ServerInterface(tk.Tk):
                 value=val).pack(anchor=W)
 
         self.btn_startgame = Button(self, text='Start Game', command=self.btn_startgame)
-        self.btn_startgame.pack(fill=X, pady=10, padx=10)
+        self.btn_startgame.pack(fill=X, pady=(10, 5), padx=10)
+
+        self.btn_helper = Button(self, text='helper', command=self.btn_helper)
+        self.btn_helper.pack(fill=X, pady=5, padx=10)
 
         self.myserver = Server()
         self.gui_loop()
+
+    def btn_helper(self):
+        GameStats(self.myserver)
 
     def btn_startgame(self):
         self.btn_startgame.configure(text="game running", state=DISABLED)
@@ -564,6 +675,144 @@ class ServerInterface(tk.Tk):
             self.lbl_plr_2.configure(bg="SeaGreen1")
 
         self.after(1000, self.gui_loop)
+
+
+class GameStats(tk.Tk):
+    def __init__(self, args):
+        self.server = args
+        self.card_epidemie = 53
+        tk.Tk.__init__(self)
+        self.title("Pandemie | Helper")
+        self.geometry("590x1100+1+1")
+
+        self.lbl_stat_1 = Label(self, text="Status", font=("Helvetica", 10, 'bold'), justify=LEFT)
+        self.lbl_stat_2 = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        sep1 = ttk.Separator(self, orient=HORIZONTAL)
+        self.lbl_p1 = Label(self, text="", font=("Helvetica", 10, 'bold'), justify=LEFT)
+        self.lbl_p2 = Label(self, text="", font=("Helvetica", 10, 'bold'), justify=LEFT)
+        self.lbl_p3 = Label(self, text="", font=("Helvetica", 10, 'bold'), justify=LEFT)
+        self.lbl_p4 = Label(self, text="", font=("Helvetica", 10, 'bold'), justify=LEFT)
+        self.lbl_player = [self.lbl_p1,  self.lbl_p2,  self.lbl_p3, self.lbl_p4]
+        sepv1 = ttk.Separator(self, orient=VERTICAL)
+        sepv2 = ttk.Separator(self, orient=VERTICAL)
+        sepv3 = ttk.Separator(self, orient=VERTICAL)
+        sepvp = [sepv1, sepv2, sepv3]
+        self.lbl_p1c = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        self.lbl_p2c = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        self.lbl_p3c = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        self.lbl_p4c = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        self.lbl_player_cards = [self.lbl_p1c, self.lbl_p2c, self.lbl_p3c, self.lbl_p4c]
+        sep2 = ttk.Separator(self, orient=HORIZONTAL)
+        self.lbl_card1 = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        self.lbl_card2 = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        sepv4 = ttk.Separator(self, orient=VERTICAL)
+        self.lbl_card3 = Label(self, text="", font="Helvetica 10", justify=LEFT)
+        self.lbl_card4 = Label(self, text="", font="Helvetica 10", justify=LEFT)
+
+        self.lbl_stat_1.grid(row=1, column=1, padx=0, pady=0, columnspan=7, sticky=W)
+        self.lbl_stat_2.grid(row=2, column=1, padx=0, pady=0, columnspan=7, sticky=W)
+        sep1.grid(row=3, pady=5, columnspan=8, sticky="ew")
+
+        for c, p in enumerate(self.lbl_player):
+            p.grid(row=4, column=(c + 1)*2-1, padx=0, pady=0, sticky=W)
+        for c, p in enumerate(self.lbl_player_cards):
+            p.grid(row=5, column=(c + 1)*2-1, padx=0, pady=0, sticky=N)
+        for c, s in enumerate(sepvp):
+            s.grid(row=4, column=(c+1)*2, rowspan=2, padx=5, sticky="ns")
+
+        sep2.grid(row=6, pady=5, columnspan=8, sticky="ew")
+        self.lbl_card1.grid(row=7, column=1, padx=0, pady=0, sticky=NW)
+        self.lbl_card2.grid(row=7, column=3, padx=0, pady=0, sticky=NW)
+        sepv4.grid(row=7, column=4, padx=5, sticky="ns")
+        self.lbl_card3.grid(row=7, column=5, padx=0, pady=0, sticky=NW)
+        self.lbl_card4.grid(row=7, column=7, padx=0, pady=0, sticky=NW)
+
+        self.helper_loop()
+
+    def close_windows(self):
+        self.master.destroy()
+
+    def helper_loop(self):
+        serverversion = self.server.serverversion
+        state = self.server.game_STATE              # "INIT"
+        player_name = self.server.player_name       # ["", "", "", ""]
+        player_role = self.server.player_role       # [0, 0, 0, 0]
+        player_cards = self.server.player_cards     # [[], [], [], []]  # in data2send included
+        player_pos = self.server.player_pos         # [2, 2, 2, 2]
+        cur = self.server.current_player            # 0
+
+        stat_infection = self.server.infection      # [24, 24, 24, 24]
+        stat_outbreak = self.server.outbreak        # 0
+        stat_inflvl = self.server.inflvl            # 0
+        stat_healing = self.server.healing          # [0, 1, 0, 2]  # 0 = active,  1 = healed,  2 = exterminated
+
+        cardpile_player = self.server.cardpile_player                   # []
+        cardpile_infection = self.server.cardpile_infection             # []
+        carddisposal_player = self.server.carddisposal_player           # []
+        carddisposal_infection = self.server.carddisposal_infection     # []
+        city = self.server.city
+
+        self.lbl_stat_1.configure(text=("STATE: " + state + ", v: " + str(serverversion) + ", Current: " + str(cur)))
+        self.lbl_stat_2.configure(text=("Infektion: " + str(stat_infection) +
+                                        ", Outbreak: " + str(stat_outbreak) +
+                                        ", inflvl: " + str(stat_inflvl) +
+                                        ", Healing: " + str(stat_healing)))
+        for c, p in enumerate(self.lbl_player):
+            p.configure(text=("Player " + str(c) + "\n" + player_name[c] +
+                              "\n role: " + str(player_role[c]) +
+                              "\n pos: " + str(player_pos[c])))
+
+        for c, p in enumerate(self.lbl_player_cards):
+            line = "Player " + str(c) + " Cards:\n"
+            for i in player_cards[c]:
+                # line += str(i) + "\n"
+                if i < 48:
+                    line += city[i].get("name") + " (" + str(i) + ")\n"
+                else:
+                    line += str(i) + "\n"
+            p.configure(text=line)
+
+        cardpile = "Player Cards:\n\n"
+        for c in cardpile_player:
+            if c < 48:
+                cardpile += city[c].get("name") + " (" + str(c) + ")\n"
+            elif c == self.card_epidemie:
+                cardpile += "<< EPIDEMIE >>" + "\n"
+            else:
+                cardpile += str(c) + "\n"
+        self.lbl_card1.configure(text=cardpile)
+
+        cardpile = "Player Disposal:\n\n"
+        for c in carddisposal_player:
+            if c < 48:
+                cardpile += city[c].get("name") + " (" + str(c) + ")\n"
+            elif c == self.card_epidemie:
+                cardpile += "<< EPIDEMIE >>" + "\n"
+            else:
+                cardpile += str(c) + "\n"
+        self.lbl_card2.configure(text=cardpile)
+
+        cardpile = "Infection Cards:\n\n"
+        for c in cardpile_infection:
+            if c < 48:
+                cardpile += city[c].get("name") + " (" + str(c) + ")\n"
+            elif c == self.card_epidemie:
+                cardpile += "<< EPIDEMIE >>" + "\n"
+            else:
+                cardpile += str(c) + "\n"
+        self.lbl_card3.configure(text=cardpile)
+
+        cardpile = "Infection Disposal:\n\n"
+        for c in carddisposal_infection:
+            if c < 48:
+                cardpile += city[c].get("name") + " (" + str(c) + ")\n"
+            elif c == self.card_epidemie:
+                cardpile += "<< EPIDEMIE >>" + "\n"
+            else:
+                cardpile += str(c) + "\n"
+        self.lbl_card4.configure(text=cardpile)
+
+        self.after(1000, self.helper_loop)
 
 
 if __name__ == '__main__':

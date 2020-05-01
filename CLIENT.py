@@ -215,36 +215,45 @@ class Client(tk.Tk):
 
         # region game variable #########################################################################################
         # player
-        self.this_player_num = 0
-        self.this_player_name = ''
-        self.this_player_cards = []
-        self.this_player_drawcards = []
-        self.this_player_range = []
-
-        self.this_player_turns = {'turns_left': 0, 'turn': 0, 'target': 0, 'use': 0}
-
         self.all_player_name = ['-', '-', '-', '-']
         self.all_player_role = [0, 0, 0, 0]
         self.all_player_pos = [2, 2, 2, 2]  # start in Atlanta
 
-        # connection
+        self.this_player_num = 0
+        self.this_player_name = ''
+        self.this_player_role = 0
+        self.this_player_pos = 2
+        self.this_player_cards = []
+        self.this_player_card_selection = []
+        self.this_player_drawcards = []
+        self.this_player_range = []
+
+        self.this_player_turns = {'sender': "", 'turn': 0, 'turns_left': 0}
+
+        # connection TODO rename con#####
         self.host = ''
         self.action = 'get_init_update'
         self.value = ''
-        self.ctrl_res_load = [0, 79, 0]  # [act load, total load, ready]
+        self.ctrl_res_load = [0, 79, 0]  # [act load, total load, ready] TODO check final value
         self.ip_am = '127.0.0.1'
         self.ip_parts = self.ip_am.split(".")
-        self.request_active = False
+
+        self.update_client = False
+        self.running = False
+        self.block_request = False
 
         # gamestats
         self.game_STATE = "INIT"  # region ###### info ######
         # INIT:         pre game
         # WAIT:         awaits game start
+        # GAME          (init over)
         # PASSIV
         # ACTION
         # SUPPLY
-        # EPIDEMIC (optional)
+        # EPIDEMIE (optional)
         # INFECT
+        # LOSE_GAME
+        # WIN_GAME
         # endregion
         self.localversion = 0
         self.current_player = 0
@@ -254,6 +263,8 @@ class Client(tk.Tk):
         self.infection = [24, 24, 24, 24]  # 0-24
         self.healing = [0, 0, 0, 0]  # 0 = active,  1 = healed,  2 = exterminated
         self.card_epidemie = 53
+        self.gameupdatelist = {'city': [], 'cards': [], 'marker1': 0, 'marker2': 0, 'playerpos': 0}
+
         # dimensions
         self.section_game_w = 1
         self.section_card = 0
@@ -334,6 +345,8 @@ class Client(tk.Tk):
         self.img_c2 = ImageTk
         self.img_inf_raw = []  # infection marker: inf_0_1.png
         self.img_inf = []
+        self.img_heal_raw = []  # marker healing: 0 = healed 1 = extinct
+        self.img_heal = []
         self.img_center_raw = Image  # center
         self.img_center = ImageTk
         self.img_p_raw = []  # player_piece
@@ -348,7 +361,7 @@ class Client(tk.Tk):
 
         # region window 01 connection connect
         self.title("Pandemie | Verbindung")
-        self.geometry("512x140")
+        self.geometry("512x140+758+1")  # TODO delete +758+1
 
         self.CONframe = Frame(self)
 
@@ -445,6 +458,7 @@ class Client(tk.Tk):
             self.after(1, self.window_00_load)
 
     def window_00_load_async(self):
+        # TODO adjust max value self.ctrl_res_load[1]
         _print("  start")
         # connection
         # try to get ip for server from php-script
@@ -459,63 +473,68 @@ class Client(tk.Tk):
 
         self.img_map_raw = Image.open(res_path + "mat/world.png")
         self.img_map = ImageTk.PhotoImage(self.img_map_raw)
-        self.ctrl_res_load[0] += 1   # 1
+        self.ctrl_res_load[0] += 1
 
         self.img_overlay_game_raw = Image.open(res_path + "mat/namen.png")
         self.img_overlay_game = ImageTk.PhotoImage(self.img_overlay_game_raw)
-        self.ctrl_res_load[0] += 1   # 2
+        self.ctrl_res_load[0] += 1
 
         self.img_action_raw = Image.open(res_path + "mat/actionbar.png")
         self.img_action = ImageTk.PhotoImage(self.img_action_raw)
-        self.ctrl_res_load[0] += 1   # 3
+        self.ctrl_res_load[0] += 1
 
         self.img_status_raw = Image.open(res_path + "mat/statusbar.png")
         self.img_status = ImageTk.PhotoImage(self.img_status_raw)
-        self.ctrl_res_load[0] += 1   # 4
+        self.ctrl_res_load[0] += 1
 
         self.img_center_raw = Image.open(res_path + "mat/center.png")
         self.img_center = ImageTk.PhotoImage(self.img_center_raw)
-        self.ctrl_res_load[0] += 1   # 5
+        self.ctrl_res_load[0] += 1
 
         for c in range(0, 55):
             # print(str(c))
             self.img_c1_raw.append(Image.open(res_path + "cards/c1_" + "{:02d}".format(c) + ".png"))
             self.img_c1.append(ImageTk.PhotoImage(self.img_c1_raw[c]))
-            self.ctrl_res_load[0] += 1   # 6-59
+            self.ctrl_res_load[0] += 1
 
         self.img_c2_back_raw = Image.open(res_path + "cards/c2_0.png")
         self.img_c2_back = ImageTk.PhotoImage(self.img_c2_back_raw)
-        self.ctrl_res_load[0] += 1  # 5
+        self.ctrl_res_load[0] += 1
 
         self.img_c2_raw = Image.open(res_path + "cards/c2_overlay.png")
         self.img_c2 = ImageTk.PhotoImage(self.img_c2_raw)
-        self.ctrl_res_load[0] += 1  # 5
+        self.ctrl_res_load[0] += 1
 
         for c in range(0, 8):
             self.img_char.append(ImageTk.PhotoImage(
                 Image.open(res_path + "cards/char_" + str(c) + ".png").resize((350, 500), Image.ANTIALIAS)))
-            self.ctrl_res_load[0] += 1   # 60-66
+            self.ctrl_res_load[0] += 1
 
         self.role_image = Label(self.PREPframe, image=self.img_char[0])
 
-        self.ctrl_res_load[0] += 1   # 67
+        self.ctrl_res_load[0] += 1
 
         self.img_inf_raw = [[Image.open(res_path + "mat/inf_" + str(x) + "_" + str(y + 1) + ".png") for x in range(4)]
                             for y in range(4)]
 
-        self.ctrl_res_load[0] += 2   # 69
+        self.ctrl_res_load[0] += 2
 
         self.img_inf = [[[ImageTk.PhotoImage(self.img_inf_raw[x][y]) for x in range(4)] for y in range(4)] for z in
                         range(3)]
 
-        self.ctrl_res_load[0] += 2   # 71
+        self.ctrl_res_load[0] += 2
 
         for p in range(0, 7):
             self.img_p_raw.append(Image.open(res_path + "mat/player_" + str(p + 1) + ".png"))
             self.img_p.append(ImageTk.PhotoImage(self.img_p_raw[p]))
-            self.ctrl_res_load[0] += 1   # 72-79
+            self.ctrl_res_load[0] += 1
 
-
+        self.img_heal_raw.append(Image.open(res_path + "mat/pan_healed.png"))
+        self.img_heal.append(ImageTk.PhotoImage(self.img_heal_raw[0]))
+        self.ctrl_res_load[0] += 1
+        self.img_heal_raw.append(Image.open(res_path + "mat/pan_ext.png"))
+        self.img_heal.append(ImageTk.PhotoImage(self.img_heal_raw[1]))
+        self.ctrl_res_load[0] += 1
 
         # loading done
         _print("  done ")
@@ -557,7 +576,7 @@ class Client(tk.Tk):
         self.CONframe.destroy()
 
         self.title("Spielvorbereitung")
-        self.geometry("700x600")
+        self.geometry("700x600+758+1")  # TODO delete +758+1
         self.PREPframe.grid()
         self.lbl1.grid(row=0, column=1, padx=5, pady=18, sticky=E)
         self.entry_n.grid(row=0, column=2, padx=5, pady=18, sticky=W + E)
@@ -575,7 +594,7 @@ class Client(tk.Tk):
             self.lbl_player_func[p].grid(row=2+p, column=4, padx=5, pady=5, sticky=E)
             self.lbl_player_rdy[p].grid(row=2+p, column=5, padx=5, pady=5, sticky=E)
 
-        self.send_request()
+        self.start_main()
 
     def window_02b_recon(self, event=None):
         _print()
@@ -626,13 +645,18 @@ class Client(tk.Tk):
                 self.action = 'recon'
                 self.value = num
                 self.recon_frame.destroy()
-                self.send_request()
+                self.start_main()
 
             else:
                 self.recon_stat.config(text="invalid player, enter 'Player No.' from 0 to 3")
         except ValueError:
             self.recon_stat.config(text="invalid entry, enter numeric value from 0 to 3")
             print("Exeption")
+
+    def start_main(self):
+        self.send_request()
+        self.running = True
+        threading.Thread(target=self.delay_request).start()
 # endregion
 
 # region ###### connection #############################################################################################
@@ -645,10 +669,25 @@ class Client(tk.Tk):
         message = libclient.Message(self.sel, sock, addr, request)
         self.sel.register(sock, events, data=message)
 
-    def delay_request(self, update):
-        time.sleep(update / 1000)
-        if not self.request_active:
+    def _update(self, *args):
+        if len(args) > 0:
+            self.action = args[0]
+        self.update_client = True
+        self.block_request = True
+        self.config(cursor="watch")
+
+    def delay_request(self):
+        u = update_intervall  # default 3000
+        while u > 0:
+            u -= 40
+            time.sleep(1 / 25)
+            if self.update_client:
+                self.update_client = False
+                u = 0
+
+        if self.running:
             self.send_request()
+            threading.Thread(target=self.delay_request).start()
 
     def send_request(self):
 
@@ -658,9 +697,6 @@ class Client(tk.Tk):
                 encoding="utf-8",
                 content=dict(action=raction, value=value),
             )
-
-        self.request_active = True
-        update = update_intervall
 
         request = create_request(self.action, self.value)
         self.start_connection(self.host, port, request)
@@ -673,7 +709,7 @@ class Client(tk.Tk):
                     try:
                         message.process_events(mask)
                         if mask == 1:
-                            update = self.game_engine(message.get_response())
+                            self.game_engine(message.get_response())
                     except Exception:
                         print(
                             "main: error: exception for",
@@ -685,17 +721,12 @@ class Client(tk.Tk):
                     break
         except KeyboardInterrupt:
             print("caught keyboard interrupt, exiting")
+# endregion
 
-        # start delay
-        self.request_active = False
-        threading.Thread(target=self.delay_request, args=(update,)).start()
-
-# game
+# region ###### game ###################################################################################################
     def game_engine(self, m_response):
-        # init
-        update = update_intervall
         m_version = m_response.get("v") if "v" in m_response else None
-        _print(str(m_response))
+        _print(str(m_response), self.game_STATE)
 
         # region MANAGE requests #######################################################################################
         if m_response.get("response"):
@@ -705,500 +736,313 @@ class Client(tk.Tk):
                 "player_set": self.game_init_player_set,
                 "recon": self.game_init_recon,
                 "update": self.game_update,
-                "new_cards": self.receive_card,
+                #"new_cards": self.receive_card,
+                #"next_player": self.next_player,
                 # GLOBAL RESPONSE - STATE-CHANGE ----------------------------------------
-                "START_GAME": self.game_init_execute_game,
+                "GAME": self.game_init_execute_game,
                 "LOSE_GAME": self.game_lose,
                 "WIN_GAME": self.game_win,
             }
-            func = switcher.get(m_response.get("response"), lambda r: update_intervall)
-            response = func(m_response)  # execute
+            func = switcher.get(m_response.get("response"), lambda r: None)  # returns new action for request
+            newaction = func(m_response)  # execute
 
-            func = switcher.get(m_response.get("state"), lambda: update_intervall)
-            state = func()
+            func = switcher.get(m_response.get("state"), lambda: None)
+            stateaction = func()
 
-            update = response if response < state else state
+            _print(self.game_STATE, newaction, stateaction)
+
+            if stateaction is not None:  # override
+                newaction = stateaction
+
+            if newaction is not None:
+                self._update(newaction)
         # endregion
-
         # region MANAGE version ########################################################################################
         else:
-
             if m_version is not None:
                 if m_version != self.localversion:
-                    update = 1
                     self.value = self.this_player_num
                     if self.game_STATE == 'INIT' or self.game_STATE == 'WAIT':
-                        self.action = "get_init_update"
-                    elif self.game_STATE in {'PASSIV', 'ACTION', 'SUPPLY', 'EPIDEMIC', 'INFECT'}:
-                        self.action = "get_update"
+                        self._update('get_init_update')
+                    elif self.game_STATE in {'PASSIV', 'ACTION', 'SUPPLY', 'EPIDEMIE', 'INFECT'}:
+                        self._update('get_update')
                     else:
                         print("FAILURE: unknown game status")
-                        self.action = 'getVersion'
-                        update = update_intervall
+                        self._update('getVersion')
+                        self.txt_status = "FAILURE: unknown game status"
                 else:
+                    # unblock
+                    self.block_request = False
+                    self.config(cursor="")
                     self.action = 'getVersion'
                     self.value = self.this_player_num
-                    # check for resize
-                    if (self.game_STATE != "INIT" and self.game_STATE != "WAIT") and \
-                            (self.old_window_h != self.winfo_height() or self.old_window_w != self.winfo_width()):
-                        self.game_show(None)
-                        update = 1
             else:
                 print("FAILURE: Game Engine - No response")
         # endregion
-
         # region MANAGE state ##########################################################################################
         # region ###### info ######
-        # INIT:         pre game
-        # WAIT:         awaits game start
+        # INIT:             pre game
+        # WAIT:             awaits game start (Player rdy)
+        # -> game execute set to PASSIV and start game
         # PASSIV
         # ACTION
         # SUPPLY
-        # EPIDEMIC (optional)
+        # EPIDEMIE (optional)
         # INFECT
         # endregion
 
-        if self.current_player == self.this_player_num and self.game_STATE == "PASSIV":
-            self.this_player_turns["turns_left"] = 4
-            self.game_STATE = "ACTION"
+        if self.game_STATE == "PASSIV":  # awaits turn
+            if self.current_player == self.this_player_num:  # init STATE: action
+                self.this_player_turns["turns_left"] = 4
+                self.this_player_turns['turn'] = 0
+                self.txt_action = "Du bist am Zug."
+                self.game_STATE = "ACTION"
+            else:
+                self.txt_status = self.all_player_name[self.current_player] + " ist am Zug."
 
         if self.game_STATE == "ACTION":
-            if self.this_player_turns["turns_left"] > 1:
-                self.txt_status = "Aktionsphase: " + str(
-                    self.this_player_turns["turns_left"]) + " Aktionen verbleibend."
-            elif self.this_player_turns["turns_left"] == 1:
-                self.txt_status = "Aktionsphase: Eine Aktion verbleibend."
-            else:  # turn is over -> after-turn-phase
+            # awaits click to set action, execute action:
+            if self.this_player_turns["turns_left"] > 0:
+                # region ###### set statustext ######
+                if self.this_player_turns["turns_left"] > 1:
+                    self.txt_status = "Aktionsphase: " + str(self.this_player_turns["turns_left"]) + \
+                                      " Aktionen verbleibend."
+                else:
+                    self.txt_status = "Aktionsphase: Eine Aktion verbleibend."
+                # endregion
+                #args 0 :  self.this_player_turns['city']
+                #args 1 :  self.this_player_turns['steps']
+                # region ###### actions: ######
+                # --- 10 - move -------------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 10:
+                    if self.this_player_turns['sender'] == "BTN":  # initialize action
+                        self.get_player_path()
+                        self.draw_city_highlight(self.this_player_range)
+                        self.txt_action = "Bewegen: Wähle Ziel. (keine Karte notwendig)"
+                    if self.this_player_turns['sender'] == "CITY":  # do action
+                        self.draw_city_highlight()
+                        self.this_player_turns['turns_left'] -= self.this_player_turns['steps']
+                        self.txt_action = ""
+                        # update server
+                        self.value = {'player': self.this_player_num,
+                                      'moveto': self.this_player_turns['city'],
+                                      'usedcards': []}
+                        self._update('player_move')
+                # --- 11 - fly direct -------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 11:
+                    if self.this_player_turns['sender'] == "BTN":  # initialize action
+                        self.draw_city_highlight(self.this_player_cards)
+                        self.txt_action = "Direktflug: Wähle Ziel. (eine Karte wird benötigt)"
+                    if self.this_player_turns['sender'] == "CITY":  # do action
+                        self.draw_city_highlight()
+                        self.this_player_turns['turns_left'] -= 1
+                        self.txt_action = ""
+                        # update server
+                        self.value = {'player': self.this_player_num,
+                                      'moveto': self.this_player_turns['city'],
+                                      'usedcards': [self.this_player_turns['city']]}
+                        self._update('player_move')
+                # --- 12 - fly charter ------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 12:
+                    if self.this_player_turns['sender'] == "BTN":  # initialize action
+                        if self.all_player_pos[self.this_player_num] in self.this_player_cards:
+                            self.txt_action = "Charterflug: Wähle Zielstadt."
+                            allcitys = [x for x in range(48)]
+                            allcitys.remove(self.all_player_pos[self.this_player_num])
+                            self.draw_city_highlight(allcitys)
+                        else:
+                            self.draw_city_highlight()
+                            self.txt_action = "Charterflug nicht möglich. (Karte vom Standort wird benötigt)"
+                    if self.this_player_turns['sender'] == "CITY":  # do action
+                        self.draw_city_highlight()
+                        self.this_player_turns['turns_left'] -= 1
+                        self.txt_action = ""
+                        # update server
+                        self.value = {'player': self.this_player_num,
+                                      'moveto': self.this_player_turns['city'],
+                                      'usedcards': [self.all_player_pos[self.this_player_num]]}
+                        self._update('player_move')
+                # --- 13 - fly special ------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 13:
+                    if self.this_player_turns['sender'] == "BTN":  # initialize action
+                        if self.city[self.all_player_pos[self.this_player_num]]['center']:
+                            self.txt_action = "Sonderflug: Wähle Zielstadt mit Forschungscenter."
+                            citys = []
+                            for c in self.city:
+                                if c['center']:
+                                    citys.append(c['ID'])
+                            citys.remove(self.all_player_pos[self.this_player_num])
+                            self.draw_city_highlight(citys)
+                        else:
+                            self.draw_city_highlight()
+                            self.txt_action = "Sonderflug nicht möglich. (Forschungszentrum benötigt)"
+                    if self.this_player_turns['sender'] == "CITY":  # do action
+                        self.draw_city_highlight()
+                        self.this_player_turns['turns_left'] -= 1
+                        self.txt_action = ""
+                        # update server
+                        self.value = {'player': self.this_player_num,
+                                      'moveto': self.this_player_turns['city'],
+                                      'usedcards': []}
+                        self._update('player_move')
+                # --- reset sender ----------------------------------------------------------------------------------- #
+                self.this_player_turns['sender'] = ""
+                # endregion
+            else:  # action is over init next STATE
+                self.this_player_turns["turn"] = 0
                 self.txt_action = ""
                 self.value = self.this_player_num
-                self.action = 'draw_card'
+                self._update('draw_playercard')
 
-        if self.game_STATE == "SUPPLY":
-            if len(self.this_player_drawcards) > 0:
-                print("epidemie")
-                pass  # draw cards TODO epidemie
-            else:
-                # self.game_canvas.find_all("")
-                self.game_canvas.itemconfigure(self.i_quicktip, fill="")
-                # self.txt_action = ""
-                self.draw_cards()
-                self.value = self.this_player_num
-                self.action = 'get_infection'
 
-        if self.game_STATE == "INFECT":
-            if len(self.this_player_drawcards) > 0:
-                pass  # infizieren
-            else:
-                pass # new player
-
-        self.i_action.configure(text=self.txt_action)
-        self.i_status.configure(text=self.txt_status)
         # endregion
 
-        print(self.action)
-
-        return update
-
-    def game_show(self, updatedata):
-
-        # region ###### get actual window dimension and calculate aspect-ration ######
-        self.update()
-        win_w = self.winfo_width()
-        win_h = self.winfo_height()
-
-        h = (5 * 8) + ((win_w - 72) / 8) / 7 * 10 + (win_w / 17 * 8) + (2 * win_w / 34)
-        w = (win_h - (190 / 7)) * (476 / 337)
-
-        if h > win_h:
-            game_w = w
-            game_h = win_h
-        else:
-            game_w = win_w
-            game_h = h
-
-        card_w = int((game_w - 72) / 8)
-        card_h = int((game_w - 72) / 8 / 7 * 10)
-
-        s_inf = 320 * game_w / (3380 * 2)  # variable for marker size (half the size)
-        s_cen = s_inf * 120 / 320
-
-        self.section_game_w = game_w
-        self.section_card = card_h + 8
-        self.section_field = int(self.section_game_w / 2.125) + self.section_card + 8
-        self.section_action = self.section_field + int(self.section_game_w / 34) + 8
-        self.section_status = self.section_action + int(self.section_game_w / 34) + 8
-        # endregion
-
-        # TODO evtl in gameengine verschieben
-        if self.current_player == self.this_player_num:
-            if self.this_player_turns["turns_left"] > 1:
-                self.txt_status = "Aktionsphase: " + str(
-                    self.this_player_turns["turns_left"]) + " Aktionen verbleibend."
-            elif self.this_player_turns["turns_left"] == 1:
-                self.txt_status = "Aktionsphase: Eine Aktion verbleibend."
-        else:
-            self.txt_status = self.all_player_name[self.current_player] + " ist am Zug."
-
-        if self.old_window_h != win_h or self.old_window_w != win_w:  # resize #########################################
-            print("RESIZE WINDOW")
-
-            for child in self.winfo_children():     # destroy all
-                child.destroy()
-
-            # set base frame over whole window
-            self.game_frame = Frame(self, width=win_w, height=win_h, bg="#333")
-            self.game_frame.place(relx=0.5, rely=0.5, width=win_w, height=win_h, anchor=CENTER)
-
-            # canvas
-            self.game_canvas = ResizingCanvas(self.game_frame, width=self.section_game_w, height=game_h,
-                                              bg="#333", highlightthickness=0)
-            self.game_canvas.bind("<Button-1>", self.game_click)
-            self.game_canvas.pack()
-
-            # infotext
-            self.i_action = Label(self, text=self.txt_action, font="Helvetica 12", bg="#747474")
-            self.i_status = Label(self, text=self.txt_status, font="Helvetica 12", bg="#747474")
-
-            x = (1 / game_w * (game_w / 34 * 18))
-            y = (1 / game_h * (self.section_field + 8 + (float(game_w) / 68)))
-            self.i_action.place(relx=x, rely=y, anchor="w")
-
-            x = (1 / game_w * (game_w / 34 * 23))
-            y = (1 / game_h * (self.section_field + 16 + (float(game_w) / 68) * 3))
-            self.i_status.place(relx=x, rely=y, anchor="w")
-
-            # map
-            self.img_map = ImageTk.PhotoImage(
-                self.img_map_raw.resize((int(self.section_game_w), int(self.section_game_w / 2.125)), Image.ANTIALIAS))
-            self.game_canvas.create_image(0, card_h + 16, image=self.img_map, anchor=NW)
-
-            # Prepare cards/BG
-            for bg in range(0, 8):
-                self.game_canvas.create_rectangle(
-                    am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), fill="#282828")
-
-            # prepare infection graphics: scale
-            for x in range(0, 4):
-                for y in range(0, 4):
-                    for z in range(0, 3):
-                        self.img_inf[z][y][x] = ImageTk.PhotoImage(self.img_inf_raw[x][y]
-                                                                   .resize((int(s_inf), int(s_inf)), Image.ANTIALIAS)
-                                                                   .rotate(z * 120 + 120))
-            # prepare center 120x120
-            self.img_center = ImageTk.PhotoImage(self.img_center_raw.resize((int(s_cen), int(s_cen)), Image.ANTIALIAS))
-
-            # BG statusbar
-            self.game_canvas.create_rectangle(
-                am_rect(0, self.section_action + 8, self.section_game_w, int(self.section_game_w / 34)),
-                fill="#282828", outline='#3a3a3a')
-
-            # DRAW -----------------------------------------------------------------------------------------------------
-            self.draw_cards()
-
-            for c in range(0, 48):  # loop through citys
-                self.draw_cities(c)
-            self.draw_overlay_game()
-            self.draw_player()
-
-            self.draw_marker(1)
-            # TODO status bar marker 2
-            # todo healing 1-4
-            self.draw_overlay_status()
-
-            self.draw_action()
-
-            # BTN
-            btnx = (float(self.section_game_w) / 34)
-            btny = self.section_field + 8
-            btns = int((float(self.section_game_w) / 34))
-
-            active = dict(fill="#000000", stipple=trans,
-                          outline="#000000", width=1,
-                          activeoutline="#00aa00", activewidth=3,
-                          tags='btn')
-            passiv = dict(fill="#000000", stipple=trans,
-                          outline="#000000", width=1,
-                          activeoutline="#aa0000", activewidth=1,
-                          tags='btn')
-
-            param = active if self.game_STATE == "ACTION" else passiv
-
-            self.game_canvas.create_rectangle(am_rect(3 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(4 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(5 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(6 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(7 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(10 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(11 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(12 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(13 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(14 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(15 * btnx, btny, btns, btns), param)
-
-            self.game_canvas.create_rectangle(am_rect(17 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(33 * btnx, btny, btns, btns), param)
-
-            self.i_quicktip = self.game_canvas.create_text(0, 0, text="", fill="", anchor=S,
-                                                           font=('Helvetica', 10), tags="info")
-
-            self.game_canvas.tag_bind("btn", "<ButtonRelease-1>", self.game_click_selector)
-            self.game_canvas.tag_bind("btn", "<Enter>", self.draw_tooltip)
-            self.game_canvas.tag_bind("btn", "<Leave>", self.dismiss_tooltip)
-
-            # set variables for resize-check
-            self.old_window_w = win_w
-            self.old_window_h = win_h
-
-        else:  # only update, no resize
-            if "cards" in updatedata:
-                print("update player cards")
-                self.draw_cards()
-            if "city" in updatedata:
-                for c in updatedata['city']:
-                    print("update city", str(c))
-                    self.draw_cities(c)
-                if len(updatedata['city']) > 0:
-                    self.draw_overlay_game()
-                    self.draw_player()
-
-            if "playerpos" in updatedata:
-                print("update player pos")
-                self.draw_player()
-
-            if "marker1" in updatedata:
-                print("update outbreak, inflvl, supplies")
-                self.draw_marker(1)
-
-            if "marker2" in updatedata:
-                print("update inf0-4, healing")
-
-            if "marker1" in updatedata or "marker2" in updatedata:
-                self.draw_overlay_status()
+        # update game if necessary
+        if self.game_STATE != 'INIT' and self.game_STATE != 'WAIT':
+            self.game_show()
 
     def game_click(self, event):
-        def check_10(c_num, s):
-            self.draw_city_highlight([])
-            if c_num != self.all_player_pos[self.this_player_num] and \
-                    s <= self.this_player_turns['turns_left']:
-                # update local
-                self.this_player_turns['turns_left'] -= s
-                self.all_player_pos[self.this_player_num] = c_num
-
-                # update game
-                self.game_show({'playerpos': 1})
-
-                # update server
-                self.value = {'player': self.this_player_num,
-                              'moveto': c_num,
-                              'usedcards': []}
-                self.action = 'player_move'
-
-                return ""
-            else:
-                return "Zug ungültig - Nicht genug Aktionen"
-
-        def check_11(c_num, s):
-            self.draw_city_highlight([])
-            if c_num in self.this_player_cards:
-                # update local
-                self.this_player_turns['turns_left'] -= 1
-                self.all_player_pos[self.this_player_num] = c_num
-                self.this_player_cards.remove(c_num)
-
-                # update game
-                self.game_show({'playerpos': 1, 'cards': 1})
-
-                # update server
-                self.value = {'player': self.this_player_num,
-                              'moveto': c_num,
-                              'usedcards': [c_num]}
-                self.action = 'player_move'
-
-                return ""
-            else:
-                return "Zug ungültig - Stadtkarte nicht vorhanden"
-
-        def check_12(c_num, s):
-            self.draw_city_highlight([])
-            if self.all_player_pos[self.this_player_num] in self.this_player_cards:
-
-                # update local
-                self.this_player_turns['turns_left'] -= 1
-                self.all_player_pos[self.this_player_num] = c_num
-                self.this_player_cards.remove(c_num)
-
-                # update game
-                self.game_show({'playerpos': 1, 'cards': 1})
-
-                # update server
-                self.value = {'player': self.this_player_num,
-                              'moveto': c_num,
-                              'usedcards': [c_num]}
-                self.action = 'player_move'
-
-                return ""
-            else:
-                return "Zug ungültig - Stadtkarte nicht vorhanden"
-
-        def check_13(c_num, s):
-            self.draw_city_highlight([])
-            if self.city[self.all_player_pos[self.this_player_num]]['center'] and\
-                    self.city[c_num]['center']:
-
-                # update local
-                self.this_player_turns['turns_left'] -= 1
-                self.all_player_pos[self.this_player_num] = c_num
-
-                # update game
-                self.game_show({'playerpos': 1})
-
-                # update server
-                self.value = {'player': self.this_player_num,
-                              'moveto': c_num,
-                              'usedcards': []}
-                self.action = 'player_move'
-
-                return ""
-            else:
-                return "Zug ungültig - kein Forschungscenter"
-
-        def turn_101(card):
-            # update local
-            burncard = []
-            if 7 > card >= len(self.this_player_cards):                         # add card to player
-                self.this_player_cards.append(self.this_player_drawcards[0])
-            elif card == 7:                                                     # dismiss card
-                burncard.append(self.this_player_drawcards[0])
-            else:                                                               # replace card
-                burncard.append(self.this_player_cards[card])
-                self.this_player_cards[card] = self.this_player_drawcards[0]
-
-            del self.this_player_drawcards[0]
-
-            # update game
-            self.receive_card()
-
-            # update server
-            self.value = {'player': self.this_player_num,
-                          'cards': self.this_player_cards,
-                          'burn': burncard}
-            self.action = 'update_cards'
-
-        if 8 < event.y < self.section_card:  # cardsection
-            card_num = math.floor(float(event.x) / (self.section_game_w / 8))
-            # print("clicked at Card: " + str(card_num))
-            # TODO cardclick
-
-            switcher = {
-                101: turn_101,  # draw_card
-                102: turn_101,  # epidemie
-                103: check_12,  # infection
-            }
-            func = switcher.get(self.this_player_turns['turn'], lambda m: "Zug ungültig")
-
-            if len(self.this_player_drawcards) > 0:
-                self.txt_action = func(card_num)  # execute
-
-        elif self.section_field > event.y > self.section_card + 8:  # map -> find city
-            # find city
-            dist = 32000
-            mycity = ""
-            mycitynum = 0
-            fy = (event.y - (self.section_card + 8))    # y-pos on field
-            for c in self.city:
-                if (0 + abs(c.get("posX") * self.section_game_w/100 - event.x) +
-                        abs(c.get("posY") * self.section_game_w/100 / 2.125 - fy)) < dist:
-                    dist = (abs(c.get("posX")*self.section_game_w/100 - event.x) +
-                                abs(c.get("posY")*self.section_game_w/100 / 2.125 - fy))
-                    mycity = c.get("name")
-                    mycitynum = c.get("ID")
-            if dist < (self.section_game_w/100 * 3):
-                # print("clicked at City: " + mycity)
-                steps = len(self.get_player_path(mycitynum))
-
-                switcher = {
-                    10: check_10,
-                    11: check_11,
-                    12: check_12,
-                    13: check_13,
-                }
-                func = switcher.get(self.this_player_turns['turn'], lambda m, s: "Zug ungültig")
-
-                if self.this_player_turns['turns_left'] > 0:
-                    self.txt_action = func(mycitynum, steps)  # execute
-                else:
-                    self.txt_action = "keine Züge vorhanden"
-        elif self.section_status > event.y > self.section_action + 8:
-            print("bar")
-
-        self.i_action.configure(text=self.txt_action)
-        self.i_status.configure(text=self.txt_status)
-
-    def game_click_selector(self, event):
-        def btn_10_turn_move():
-            if self.game_STATE == "ACTION":
-                self.this_player_turns['turn'] = 10
-                self.get_player_path()
-                self.draw_city_highlight(self.this_player_range)
-                self.txt_action = "Bewegen: Wähle Ziel. (keine Karte notwendig)"
-            else:
-                self.txt_action = "Du bist nicht am Zug."
-
-        # TODO 11-13 anpassen
-        def btn_11_turn_fly_direct():
-            self.this_player_turns['turn'] = 11
-            self.draw_city_highlight(self.this_player_cards)
-            self.txt_action = "Direktflug: Wähle Ziel. (eine Karte wird benötigt)"
-
-        def btn_12_turn_fly_charter():
-            if self.all_player_pos[self.this_player_num] in self.this_player_cards:
-                self.this_player_turns['turn'] = 12
-                self.txt_action = "Charterflug: Wähle Zielstadt."
-                allcitys = [x for x in range(48)]
-                allcitys.remove(self.all_player_pos[self.this_player_num])
-                self.draw_city_highlight(allcitys)
-            else:
-                self.txt_action = "Charterflug nicht möglich. (Karte vom Standort wird benötigt)"
-
-        def btn_13_turn_fly_special():
-            if self.city[self.all_player_pos[self.this_player_num]]['center']:
-                self.this_player_turns['turn'] = 13
-                self.txt_action = "Sonderflug: Wähle Zielstadt mit Forschungscenter."
-                citys = []
+        if not self.block_request:
+            # region ###### CLICK @ CARDS ##############################################################################
+            if 8 < event.y < self.section_card:  # cardsection
+                card_num = math.floor(float(event.x) / (self.section_game_w / 8))
+                _print("clicked at Card: " + str(card_num))
+            # endregion
+            # region ###### CLICK @ FIELD ##############################################################################
+            elif self.section_field > event.y > self.section_card + 8:  # map -> find city
+                # find city
+                dist = 32000
+                mycity = ""
+                mycitynum = 0
+                fy = (event.y - (self.section_card + 8))  # y-pos on field
                 for c in self.city:
-                    if c['center']:
-                        citys.append(c['ID'])
-                citys.remove(self.all_player_pos[self.this_player_num])
-                self.draw_city_highlight(citys)
-            else:
-                self.txt_action = "Sonderflug nicht möglich. (Forschungszentrum benötigt)"
+                    if (0 + abs(c.get("posX") * self.section_game_w / 100 - event.x) +
+                            abs(c.get("posY") * self.section_game_w / 100 / 2.125 - fy)) < dist:
+                        dist = (abs(c.get("posX") * self.section_game_w / 100 - event.x) +
+                                abs(c.get("posY") * self.section_game_w / 100 / 2.125 - fy))
+                        mycity = c.get("name")
+                        mycitynum = c.get("ID")
+                #if dist < (self.section_game_w / 100 * 3):
+                _print("clicked at City: " + mycity)
+                self.this_player_turns['sender'] = "CITY"
+                self.this_player_turns['city'] = mycitynum
+                self.this_player_turns['steps'] = len(self.get_player_path(mycitynum))
 
-        def btn_33_game_reload():
-            self.txt_action = "reload Game..."
-            self.localversion = 0
 
-        posx = self.game_canvas.coords(tk.CURRENT)[0] + event.widget.winfo_width() / 68
-        num = math.floor(float(posx) / self.section_game_w * 34)
+            # endregion
+            # region ###### CLICK @ BAR/BTN ############################################################################
+            elif event.y > self.section_field + 8:
+                posx = self.game_canvas.coords(tk.CURRENT)[0] + event.widget.winfo_width() / 68
+                num = math.floor(float(posx) / self.section_game_w * 34)
+                _print("action-BTN", str(num), "clicked.")
 
-        print("action-BTN", str(num), "clicked.")
-        # assign BTN number to action ##################################################################################
-        switcher = {
-            10: btn_10_turn_move,
-            11: btn_11_turn_fly_direct,
-            12: btn_12_turn_fly_charter,
-            13: btn_13_turn_fly_special,
-            # 17: btn_17_turn_execute,
-            33: btn_33_game_reload
-        }
-        func = switcher.get(num, lambda: None)
+                if self.this_player_turns['turns_left'] > 0 and self.game_STATE == "ACTION":
+                    self.this_player_turns['turn'] = num
+                    self.this_player_turns['sender'] = "BTN"
+                else:
+                    if self.this_player_turns['turns_left'] <= 0:
+                        self.txt_action = "keine Züge vorhanden"
+                    else:
+                        self.txt_action = "Du bist nicht am Zug."
+            # endregion
 
-        if self.this_player_turns['turns_left'] > 0:
-            func()  # execute
+            self._update()
+
+# region ------ INIT ---------------------------------------------------------------------------------------------------
+    def game_init_update(self, args):
+        def get_role_name(num):
+            switcher = {
+                0: "-",
+                1: "Wissenschaftlerin",
+                2: "Quarantäne-Spezialistin",
+                3: "Krisenmanager",
+                4: "Forscherin",
+                5: "Logistiker",
+                6: "Sanitäter",
+                7: "Betriebsexperte",
+            }
+            return switcher.get(num, "Invalid request")
+
+        # update version
+        self.localversion = args.get("v")
+
+        # player_name / player role
+        self.all_player_name = args.get("player")
+        self.all_player_role = args.get("player_role")
+
+        for p in range(0, 4):
+            self.lbl_player_name[p].configure(text=self.all_player_name[p])
+            self.lbl_player_func[p].configure(text=get_role_name(self.all_player_role[p]))
+            if args.get("player_rdy")[p] == 1:
+                self.lbl_player_rdy[p].configure(text="P", font=("Wingdings 2", 16, 'bold'), fg="#006600")
+
+        return 'getVersion'
+
+    def game_init_player_set(self, args):
+        _print()
+
+        # playernum
+        self.this_player_num = args.get("player_num")    # [0..4]
+        print("player_set: thisplayer_num:", str(self.this_player_num))
+
+        # player_name / player role
+        self.all_player_role = args.get("player_role")
+        self.all_player_name = args.get("player")
+
+        if self.this_player_num > 3:
+            print("to many players")
+            self.lbl2.configure(text="Zu viele Spieler")
         else:
-            self.txt_action = "keine Züge vorhanden"
+            self.btn_start.configure(state=NORMAL)
 
-        self.i_action.configure(text=self.txt_action)  # update description for player
-        self.i_status.configure(text=self.txt_status)  # update description for player
+            self.role_image.configure(image=self.img_char[self.all_player_role[self.this_player_num]])
+
+        return self.game_init_update(args)
+
+    def game_init_recon(self, args):
+        _print()
+        self.localversion = 0  # -> force update after recon
+        self.this_player_name = args.get("player")[self.this_player_num]
+        self.all_player_role = args.get("player_role")
+        self.game_STATE = args.get("state")
+        self.game_STATE = "WAIT"
+
+        return self.game_init_execute_game()
+
+    def game_init_execute_game(self):
+        if self.game_STATE == "WAIT":
+            _print()
+            self.PREPframe.destroy()
+
+            self.title("Pandemie")  # region UI
+
+            user32 = ctypes.windll.user32
+            # screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+            # print(str(user32.GetSystemMetrics(0)) + "x" + str(user32.GetSystemMetrics(1)))
+            win_x = user32.GetSystemMetrics(0) - 20
+            win_y = user32.GetSystemMetrics(1) - 60
+
+            win_x = int(win_x / 1.5)   # TODO DELETE THIS LINE #########################################################
+            win_y = int(win_y / 1.5)   # TODO DELETE THIS LINE #########################################################
+            self.geometry(str(win_x) + 'x' + str(win_y) + '+758+1')  # TODO change +758+1 to +2+2
+
+            # self.display_game(None)
+            self.lbl_empty.place(relx=0.5, rely=0.5, anchor=CENTER)
+
+            self.game_STATE = 'PASSIV'
+        return 'get_update'
+# endregion
+
+# region ------ MAINGAME -----------------------------------------------------------------------------------------------
+    def game_lose(self):
+        # TODO lose game
+        print("You lose.")
+        return 'getVersion'
+
+    def game_win(self):
+        # TODO win game
+        print("WIN!")
+        return 'getVersion'
 
     def get_player_path(self, *args):
         def get_pre(pre_a, t):
@@ -1254,99 +1098,11 @@ class Client(tk.Tk):
                             append = False
                     if append:
                         self.this_player_range.append(s)
-
-# region ###### init ###################################################################################################
-    def game_init_update(self, args):
-        def get_role_name(num):
-            switcher = {
-                0: "-",
-                1: "Wissenschaftlerin",
-                2: "Quarantäne-Spezialistin",
-                3: "Krisenmanager",
-                4: "Forscherin",
-                5: "Logistiker",
-                6: "Sanitäter",
-                7: "Betriebsexperte",
-            }
-            return switcher.get(num, "Invalid request")
-
-        # _print(str(args))
-
-        # update version
-        self.localversion = args.get("v")
-
-        # player_name / player role
-        self.all_player_name = args.get("player")
-        self.all_player_role = args.get("player_role")
-
-        for p in range(0, 4):
-            self.lbl_player_name[p].configure(text=self.all_player_name[p])
-            self.lbl_player_func[p].configure(text=get_role_name(self.all_player_role[p]))
-            if args.get("player_rdy")[p] == 1:
-                self.lbl_player_rdy[p].configure(text="P", font=("Wingdings 2", 16, 'bold'), fg="#006600")
-
-        self.action = 'getVersion'
-        return update_intervall
-
-    def game_init_player_set(self, args):
-        _print()
-
-        # playernum
-        self.this_player_num = args.get("player_num")    # [0..4]
-        print("player_set: thisplayer_num:", str(self.this_player_num))
-
-        # player_name / player role
-        self.all_player_role = args.get("player_role")
-        self.all_player_name = args.get("player")
-
-        if self.this_player_num > 3:
-            print("to many players")
-            self.lbl2.configure(text="Zu viele Spieler")
-        else:
-            self.btn_start.configure(state=NORMAL)
-
-            self.role_image.configure(image=self.img_char[self.all_player_role[self.this_player_num]])
-
-        return self.game_init_update(args)
-
-    def game_init_recon(self, args):
-        self.localversion = 0  # -> force update after recon
-        self.this_player_name = args.get("player")[self.this_player_num]
-        self.all_player_role = args.get("player_role")
-        self.game_STATE = args.get("state")
-        self.game_STATE = "WAIT"
-
-        return self.game_init_execute_game()
-
-    def game_init_execute_game(self):
-        if self.game_STATE == "WAIT":
-            _print()
-            self.PREPframe.destroy()
-
-            self.title("Pandemie")  # region UI
-
-            user32 = ctypes.windll.user32
-            # screensize = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-            # print(str(user32.GetSystemMetrics(0)) + "x" + str(user32.GetSystemMetrics(1)))
-            win_x = user32.GetSystemMetrics(0) - 20
-            win_y = user32.GetSystemMetrics(1) - 60
-
-            win_x = int(win_x / 1.5)   # TODO DELETE THIS LINE #########################################################
-            win_y = int(win_y / 1.5)   # TODO DELETE THIS LINE #########################################################
-
-            self.geometry(str(win_x) + 'x' + str(win_y) + '+2+2')
-
-            # self.display_game(None)
-            self.lbl_empty.place(relx=0.5, rely=0.5, anchor=CENTER)
-
-            self.action = 'get_update'
-            self.game_STATE = 'PASSIV'
-            return 1
-
-        return update_intervall
+            self.this_player_range.remove(aktpos)
 # endregion
 
-# main game
+# region ###### DRAW ###################################################################################################
+
     def game_update(self, args):
         # region info read data ########################################################################################
         # v = serverversion,
@@ -1365,9 +1121,6 @@ class Client(tk.Tk):
 
         self.current_player = args.get('cur_player')
 
-        # build updatelist
-        updatelist = {'city': []}
-
         # cities
         for c in range(0, 48):
             akt_c = self.city[c]['i0'], self.city[c]['i1'], self.city[c]['i2'], self.city[c]['i3'], \
@@ -1378,12 +1131,20 @@ class Client(tk.Tk):
                 self.city[c]['i2'] = data[c][2]
                 self.city[c]['i3'] = data[c][3]
                 self.city[c]['center'] = data[c][4]
-                updatelist['city'].append(c)
+                self.gameupdatelist['city'].append(c)
 
         # cards
         if self.this_player_cards != data[self.this_player_num + 48]:
+
+            r = len(self.this_player_cards) if len(self.this_player_cards) < len(data[self.this_player_num + 48]) \
+                else len(data[self.this_player_num + 48])
+            for c in range(0, 7):
+                if c < r:
+                    if self.this_player_cards[c] != data[self.this_player_num + 48][c]:
+                        self.gameupdatelist['cards'].append(c)
+                else:
+                    self.gameupdatelist['cards'].append(c)
             self.this_player_cards = data[self.this_player_num + 48]
-            updatelist['cards'] = 1
 
         # marker
         akt_m = self.outbreak, self.inflvl, self.supplies
@@ -1391,117 +1152,210 @@ class Client(tk.Tk):
             self.outbreak = data[52][0]
             self.inflvl = data[52][1]
             self.supplies = data[52][2]
-            updatelist['marker1'] = 1
+            self.gameupdatelist['marker1'] = 1
 
         count = 0
         for i in range(0, 4):
-            if self.infection[i] != data[52][3 + i] or self.healing[i] != data[52][7 + i]:
+            if self.infection[i] != data[52][3 + i]:
                 count = 1
             self.infection[i] = data[52][3 + i]
+        if count > 0:
+            self.gameupdatelist['marker1'] = 1
+
+        count = 0
+        for i in range(0, 4):
+            if self.healing[i] != data[52][7 + i]:
+                count = 1
             self.healing[i] = data[52][7 + i]
         if count > 0:
-            updatelist['marker2'] = 1
+            self.gameupdatelist['marker2'] = 1
 
         # player pos
         if self.all_player_pos != data[53]:
             self.all_player_pos = data[53]
-            updatelist['playerpos'] = 1
+            self.gameupdatelist['playerpos'] = 1
 
-        self.game_show(updatelist)
-
-        self.action = 'getVersion'
         # update version
         self.localversion = args.get("v")
-        return 1
 
-    def receive_card(self, *args):
-        # nachschubphase, neue karten
-        _print(args)
-        if len(args) > 0:
-            if 'new_cards' in args[0] and self.game_STATE == "ACTION":
-                self.this_player_drawcards = args[0]['new_cards']
-                self.txt_status = "Nachschubphase"
-                self.game_STATE = "SUPPLY"
-            if 'new_inf' in args[0] and self.game_STATE == "SUPPLY":
-                self.this_player_drawcards = args[0]['new_inf']
-                self.txt_status = "Infektionsphase"
-                self.game_STATE = "INFECT"
+        return 'getVersion'
 
-        self.draw_cards()
-        self.draw_card_highlight()
+    def game_show(self):
 
-        _print(self.this_player_drawcards)
+        # region ###### get actual window dimension and calculate aspect-ration ######
+        self.update()
+        win_w = self.winfo_width()
+        win_h = self.winfo_height()
 
-        if len(self.this_player_drawcards) > 0:
-            if self.this_player_drawcards[0] != self.card_epidemie:
-                if self.game_STATE == "SUPPLY":
-                    self.this_player_turns['turn'] = 101
-                    self.txt_action = "Ziehe Karte."
-                if self.game_STATE == "INFECT":
-                    self.this_player_turns['turn'] = 201  # TODO turn 201 in click
-                    self.txt_action = "Infiziere Stadt"
-            else:
-                # epidemie
-                print("epidemie")
-                self.this_player_turns['turn'] = 102
-                self.txt_action = "Epidemie"
+        h = (5 * 8) + ((win_w - 72) / 8) / 7 * 10 + (win_w / 17 * 8) + (2 * win_w / 34)
+        w = (win_h - (190 / 7)) * (476 / 337)
 
-        self.i_action.configure(text=self.txt_action)  # update description for player
-        self.i_status.configure(text=self.txt_status)  # update description for player
-
-        self.action = 'getVersion'
-        return 1
-
-    def game_lose(self):
-        # TODO lose game
-        print("You lose.")
-        return True
-
-    def game_win(self):
-        # TODO win game
-        print("WIN!")
-        return True
-
-# draw
-    def draw_cards(self):
-        print(self.this_player_cards)
-        self.game_canvas.delete("cards")
-        card_w = int((self.section_game_w - 72) / 8)
-        card_h = int((self.section_game_w - 72) / 8 / 7 * 10)
-        place = 0
-
-        # draw player cards
-        for card in self.this_player_cards:
-            self.img_c1[card] = ImageTk.PhotoImage(
-                self.img_c1_raw[card].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
-            self.game_canvas.create_image(
-                8 + (8 + card_w) * place, 8, image=self.img_c1[card], anchor=NW, tags="cards")
-            place += 1
-
-        # draw card pile
-        if len(self.this_player_drawcards) > 0:
-            self.img_c1[self.this_player_drawcards[0]] = ImageTk.PhotoImage(
-                self.img_c1_raw[self.this_player_drawcards[0]].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
-            self.game_canvas.create_image(
-                8 + (8 + card_w) * 7, 8, image=self.img_c1[self.this_player_drawcards[0]], anchor=NW, tags="cards")
-            if self.game_STATE == "INFECT":
-                self.img_c2 = ImageTk.PhotoImage(
-                    self.img_c2_raw.resize((int(card_w), int(card_h)), Image.ANTIALIAS))
-                self.game_canvas.create_image(
-                    8 + (8 + card_w) * 7, 8, image=self.img_c2, anchor=NW, tags="cards")
-
+        if h > win_h:
+            game_w = w
+            game_h = win_h
         else:
-            if self.game_STATE == "INFECT":
-                self.img_c2_back = ImageTk.PhotoImage(
-                    self.img_c2_back_raw.resize((int(card_w), int(card_h)), Image.ANTIALIAS))
-                self.game_canvas.create_image(
-                    8 + (8 + card_w) * 7, 8, image=self.img_c2_back, anchor=NW, tags="cards")
+            game_w = win_w
+            game_h = h
 
-            else:
-                self.img_c1[54] = ImageTk.PhotoImage(
-                    self.img_c1_raw[54].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
-                self.game_canvas.create_image(
-                    8 + (8 + card_w) * 7, 8, image=self.img_c1[54], anchor=NW, tags="cards")
+        card_w = int((game_w - 72) / 8)
+        card_h = int((game_w - 72) / 8 / 7 * 10)
+
+        s_inf = 320 * game_w / (3380 * 2)  # variable for marker size (half the size)
+        s_cen = s_inf * 120 / 320
+
+        self.section_game_w = game_w
+        self.section_card = card_h + 8
+        self.section_field = int(self.section_game_w / 2.125) + self.section_card + 8
+        self.section_action = self.section_field + int(self.section_game_w / 34) + 8
+        self.section_status = self.section_action + int(self.section_game_w / 34) + 8
+        # endregion
+
+        if self.old_window_h != win_h or self.old_window_w != win_w:  # resize #########################################
+            print("RESIZE WINDOW")
+
+            for child in self.winfo_children():     # destroy all
+                child.destroy()
+
+            # set base frame over whole window
+            self.game_frame = Frame(self, width=win_w, height=win_h, bg="#333")
+            self.game_frame.place(relx=0.5, rely=0.5, width=win_w, height=win_h, anchor=CENTER)
+
+            # canvas
+            self.game_canvas = ResizingCanvas(self.game_frame, width=self.section_game_w, height=game_h,
+                                              bg="#333", highlightthickness=0)
+            # TODO CHECK!!! self.game_canvas.bind("<Button-1>", self.game_click)
+            self.game_canvas.pack()
+
+            # infotext
+            self.i_action = Label(self, text=self.txt_action, font="Helvetica 12", bg="#747474")
+            self.i_status = Label(self, text=self.txt_status, font="Helvetica 12", bg="#747474")
+
+            x = (1 / game_w * (game_w / 34 * 18))
+            y = (1 / game_h * (self.section_field + 8 + (float(game_w) / 68)))
+            self.i_action.place(relx=x, rely=y, anchor="w")
+
+            x = (1 / game_w * (game_w / 34 * 23))
+            y = (1 / game_h * (self.section_field + 16 + (float(game_w) / 68) * 3))
+            self.i_status.place(relx=x, rely=y, anchor="w")
+
+            # map
+            self.img_map = ImageTk.PhotoImage(
+                self.img_map_raw.resize((int(self.section_game_w), int(self.section_game_w / 2.125)), Image.ANTIALIAS))
+            self.game_canvas.create_image(0, card_h + 16, image=self.img_map, anchor=NW)
+
+            # Prepare cards/BG
+            for bg in range(0, 8):
+                self.game_canvas.create_rectangle(
+                    am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), fill="#282828")
+
+            # prepare infection graphics: scale
+            for x in range(0, 4):
+                for y in range(0, 4):
+                    for z in range(0, 3):
+                        self.img_inf[z][y][x] = ImageTk.PhotoImage(self.img_inf_raw[x][y]
+                                                                   .resize((int(s_inf), int(s_inf)), Image.ANTIALIAS)
+                                                                   .rotate(z * 120 + 120))
+            # prepare center 120x120
+            self.img_center = ImageTk.PhotoImage(self.img_center_raw.resize((int(s_cen), int(s_cen)), Image.ANTIALIAS))
+
+            # BG statusbar
+            self.game_canvas.create_rectangle(
+                am_rect(0, self.section_action + 8, self.section_game_w, int(self.section_game_w / 34)),
+                fill="#282828", outline='#3a3a3a')
+
+            # prepare healing icons
+            heal_w = (float(self.section_game_w) / 34) / 100 * 75
+            self.img_heal[0] = ImageTk.PhotoImage(
+                self.img_heal_raw[0].resize((int(heal_w), int(heal_w)), Image.ANTIALIAS))
+            self.img_heal[1] = ImageTk.PhotoImage(
+                self.img_heal_raw[1].resize((int(heal_w), int(heal_w)), Image.ANTIALIAS))
+
+            # DRAW -----------------------------------------------------------------------------------------------------
+            for c in range(0, len(self.this_player_cards)):
+                self.draw_cards(c)
+
+            for c in range(0, 48):  # loop through citys
+                self.draw_cities(c)
+            self.draw_overlay_game()
+            self.draw_player()
+
+            self.draw_marker(1)
+            # self.draw_overlay_status()
+            self.draw_marker(2)
+
+            self.draw_bar()
+
+            # BTN
+            btnx = (float(self.section_game_w) / 34)
+            btny = self.section_field + 8
+            btns = int((float(self.section_game_w) / 34))
+
+            active = dict(fill="#000000", stipple=trans,
+                          outline="#000000", width=1,
+                          activeoutline="#00aa00", activewidth=3,
+                          tags='btn')
+            passiv = dict(fill="#000000", stipple=trans,
+                          outline="#000000", width=1,
+                          activeoutline="#aa0000", activewidth=1,
+                          tags='btn')
+
+            param = active if self.game_STATE == "ACTION" else passiv
+
+            self.game_canvas.create_rectangle(am_rect(3 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(4 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(5 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(6 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(7 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(10 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(11 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(12 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(13 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(14 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(15 * btnx, btny, btns, btns), param)
+
+            self.game_canvas.create_rectangle(am_rect(17 * btnx, btny, btns, btns), param)
+
+            self.game_canvas.create_rectangle(am_rect(32 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(33 * btnx, btny, btns, btns), param)
+
+            self.i_quicktip = self.game_canvas.create_text(0, 0, text="", fill="", anchor=S,
+                                                           font=('Helvetica', 10), tags="info")
+
+            self.game_canvas.tag_bind("btn", "<ButtonRelease-1>", self.game_click)
+            self.game_canvas.tag_bind("btn", "<Enter>", self.draw_tooltip)
+            self.game_canvas.tag_bind("btn", "<Leave>", self.dismiss_tooltip)
+
+            # set variables for resize-check
+            self.old_window_w = win_w
+            self.old_window_h = win_h
+
+            # TODO check final
+            self.gameupdatelist = {'city': [], 'cards': [], 'marker1': 0, 'marker2': 0, 'playerpos': 0}
+
+        else:  # only update, no resize
+
+            for c in self.gameupdatelist['city']:
+                self.draw_cities(c)
+            if len(self.gameupdatelist['city']) > 0:
+                self.draw_overlay_game()
+                self.draw_player()
+
+            for c in self.gameupdatelist['cards']:
+                self.draw_cards(c)
+
+            if self.gameupdatelist['playerpos'] == 1:
+                self.draw_player()
+
+            if self.gameupdatelist['marker1'] == 1:
+                self.draw_marker(1)
+
+            if self.gameupdatelist['marker2'] == 1 and not self.gameupdatelist['marker1'] == 1:
+                self.draw_marker(2)
+
+            if self.i_action['text'] != self.txt_action:
+                self.i_action.configure(text=self.txt_action)
+            if self.i_status['text'] != self.txt_status:
+                self.i_status.configure(text=self.txt_status)
 
     def draw_cities(self, aw):
         def inf_value(e):
@@ -1544,6 +1398,55 @@ class Client(tk.Tk):
                                           image=self.img_center,
                                           anchor=CENTER,
                                           tags=("c" + str(c.get('ID')), "center"))
+        self.gameupdatelist['city'] = []
+
+    def draw_cards(self, card_num):
+        self.game_canvas.delete("card" + str(card_num))
+        card_w = int((self.section_game_w - 72) / 8)
+        card_h = int((self.section_game_w - 72) / 8 / 7 * 10)
+
+        # draw player card
+        if card_num < len(self.this_player_cards):
+            card = self.this_player_cards[card_num]
+            self.img_c1[card] = ImageTk.PhotoImage(
+                self.img_c1_raw[card].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
+            self.game_canvas.create_image(
+                8 + (8 + card_w) * card_num, 8, image=self.img_c1[card], anchor=NW, tags="card" + str(card_num))
+
+        # draw card pile TODO check
+        if len(self.this_player_drawcards) > 0:
+            self.img_c1[self.this_player_drawcards[0]] = ImageTk.PhotoImage(
+                self.img_c1_raw[self.this_player_drawcards[0]].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
+            self.game_canvas.create_image(
+                8 + (8 + card_w) * 7, 8, image=self.img_c1[self.this_player_drawcards[0]], anchor=NW, tags="cards")
+            if self.game_STATE == "INFECT" or self.game_STATE == "EPIDEMIE":
+                self.img_c2 = ImageTk.PhotoImage(
+                    self.img_c2_raw.resize((int(card_w), int(card_h)), Image.ANTIALIAS))
+                self.game_canvas.create_image(
+                    8 + (8 + card_w) * 7, 8, image=self.img_c2, anchor=NW, tags="cards")
+
+        else:  # TODO check
+            if self.game_STATE == "INFECT":
+                self.img_c2_back = ImageTk.PhotoImage(
+                    self.img_c2_back_raw.resize((int(card_w), int(card_h)), Image.ANTIALIAS))
+                self.game_canvas.create_image(
+                    8 + (8 + card_w) * 7, 8, image=self.img_c2_back, anchor=NW, tags="cards")
+
+            else:
+                self.img_c1[54] = ImageTk.PhotoImage(
+                    self.img_c1_raw[54].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
+                self.game_canvas.create_image(
+                    8 + (8 + card_w) * 7, 8, image=self.img_c1[54], anchor=NW, tags="cards")
+
+        self.gameupdatelist['cards'] = []
+
+    def draw_bar(self):
+        self.img_action = ImageTk.PhotoImage(
+            self.img_action_raw.resize((int(self.section_game_w), int(self.section_game_w / 34)), Image.ANTIALIAS))
+        self.game_canvas.create_rectangle(
+            am_rect(0, self.section_field + 8, self.section_game_w, int(self.section_game_w / 34)),
+            fill="#282828", outline='#3a3a3a')
+        self.game_canvas.create_image(0, self.section_field + 8, image=self.img_action, anchor=NW, tags="action")
 
     def draw_player(self):
         self.game_canvas.delete("player")
@@ -1568,29 +1471,47 @@ class Client(tk.Tk):
                     self.game_canvas.create_image(
                         x, y, image=self.img_p[self.all_player_role[p] - 1], anchor=CENTER, tags="player")
 
+        self.gameupdatelist['playerpos'] = 0
+
     def draw_marker(self, marker):
         def am_marker(xy, wh, mpos):
             return xy[0] + wh[0] * mpos[0], xy[1] + wh[1] * mpos[1], \
                    xy[0] + wh[0] * mpos[0] + wh[0], xy[1] + wh[1] * mpos[1] + wh[1]
 
         if marker == 1:
+            self.game_canvas.delete("m1")
             # marker 1
-            out_a = float(self.section_game_w) / 34 * 5, self.section_action + 9
+            out_a = float(self.section_game_w) / 34 * 5, self.section_action + 8
             lvl_a = float(self.section_game_w) / 34 * 5, self.section_action + 8 + float(
-                self.section_game_w / 34) / 100 * 56
-            inf_a = float(self.section_game_w) / 34 * 12, self.section_action + 8
+                self.section_game_w / 34) / 2
             out_size = float(self.section_game_w / 34) / 100 * 50, float(self.section_game_w / 34) / 100 * 50
-            inf_size = float(self.section_game_w / 34) / 100 * 25, float(self.section_game_w / 34) / 100 * 25
 
             # outbreak
-            for o in range(0, self.outbreak):
+            for o in range(0, self.outbreak + 1):
                 self.game_canvas.create_rectangle(am_marker(out_a, out_size, (o, 0)),
-                                                  fill="#ff00ff", outline='', tags="m1")
+                                                  fill="#ff9c00", outline='', tags="m1")
             # infection lvl
             pos = (8 if self.inflvl > 8 else self.inflvl)
             self.game_canvas.create_rectangle(am_marker(lvl_a, out_size, (pos, 0)),
-                                              fill="#ff00ff", outline='', tags="m1")
+                                              fill="#ff9c00", outline='', tags="m1")
             # supplies
+            # max: 59
+            # self.supplies
+            sup_x = float(self.section_game_w) / 34 * 20
+            sup_y = self.section_action + 8 + float(self.section_game_w / 34) / 2
+            sup_s = float(self.section_game_w / 34) / 2 - 2
+            self.game_canvas.create_rectangle(am_rect(sup_x, sup_y, sup_s, sup_s),
+                                              fill="#4eff00", outline='', tags="m1")
+            sup_h = (float(self.section_game_w) / 34) / 100 * 12
+            sup_w = ((float(self.section_game_w) / 34) / 100 * 352) / 59 * self.supplies
+            sup_t = (float(self.section_game_w) / 34) / 100 * 32
+            self.game_canvas.create_rectangle(am_rect(sup_x + sup_s, sup_y + sup_t, sup_w, sup_h),
+                                              fill="#4eff00", outline='', tags="m1")
+
+
+            inf_a = float(self.section_game_w) / 34 * 12, self.section_action + 8
+            inf_size = float(self.section_game_w / 34) / 100 * 25, float(self.section_game_w / 34) / 100 * 25
+            # infection
             for i in range(0, 24):
                 if 24 - self.infection[0] > i:
                     self.game_canvas.create_rectangle(am_marker(inf_a, inf_size, (i, 0)),
@@ -1604,18 +1525,33 @@ class Client(tk.Tk):
                 if 24 - self.infection[3] > i:
                     self.game_canvas.create_rectangle(am_marker(inf_a, inf_size, (i, 3)),
                                                       fill="#f10000", outline='', tags="m1")
-        if marker == 2:
-            # marker 2
-            # TODO marker 2
-            print("")
 
-    def draw_action(self):
-        self.img_action = ImageTk.PhotoImage(
-            self.img_action_raw.resize((int(self.section_game_w), int(self.section_game_w / 34)), Image.ANTIALIAS))
-        self.game_canvas.create_rectangle(
-            am_rect(0, self.section_field + 8, self.section_game_w, int(self.section_game_w / 34)),
-            fill="#282828", outline='#3a3a3a')
-        self.game_canvas.create_image(0, self.section_field + 8, image=self.img_action, anchor=NW, tags="action")
+            self.draw_overlay_bar()
+            self.draw_marker(2)
+            self.gameupdatelist['marker1'] = 0
+
+        if marker == 2:
+            self.game_canvas.delete("m2")
+
+            heal_x = float(self.section_game_w) / 34 * 21
+            heal_y = self.section_action + 8
+            heal_w = (float(self.section_game_w) / 34) / 100 * 75
+            for h in range(0, 4):
+                if self.healing[h] == 1:
+                    self.game_canvas.create_image(int(heal_x + heal_w * h), heal_y,
+                                                  image=self.img_heal[0], anchor=NW, tags="m2")
+                if self.healing[h] == 2:
+                    self.game_canvas.create_image(int(heal_x + heal_w * h), heal_y,
+                                                  image=self.img_heal[1], anchor=NW, tags="m2")
+            self.gameupdatelist['marker2'] = 0
+
+    def draw_overlay_bar(self):
+        self.game_canvas.delete("status_overlay")
+        # status overlay
+        self.img_status = ImageTk.PhotoImage(
+            self.img_status_raw.resize((int(self.section_game_w), int(self.section_game_w / 34)), Image.ANTIALIAS))
+        self.game_canvas.create_image(0, self.section_action + 8, image=self.img_status, anchor=NW,
+                                      tags="status_overlay")
 
     def draw_overlay_game(self):
         self.game_canvas.delete("game_overlay")
@@ -1626,67 +1562,73 @@ class Client(tk.Tk):
                                              Image.ANTIALIAS))
         self.game_canvas.create_image(0, card_h + 16, image=self.img_overlay_game, anchor=NW, tags="game_overlay")
 
-    def draw_overlay_status(self):
-        self.game_canvas.delete("status_overlay")
-        # status overlay
-        self.img_status = ImageTk.PhotoImage(
-            self.img_status_raw.resize((int(self.section_game_w), int(self.section_game_w / 34)), Image.ANTIALIAS))
-        self.game_canvas.create_image(0, self.section_action + 8, image=self.img_status, anchor=NW,
-                                      tags="status_overlay")
-
-    def draw_card_highlight(self):
+    def draw_card_highlight(self, *args):
         self.game_canvas.delete("card_highlight")
 
         card_w = int((self.section_game_w - 72) / 8)
         card_h = int((self.section_game_w - 72) / 8 / 7 * 10)
 
-        if len(self.this_player_drawcards) > 0:
-            if self.this_player_drawcards[0] == self.card_epidemie:
-                # Epidemie
-                self.game_canvas.create_rectangle(
-                    am_rect(6 + (8 + card_w) * 7, 6, card_w + 4, card_h + 4),
-                    outline="#00ff00", fill="#000000", stipple=trans,
-                    activeoutline="#00ff00", activefill="", activestipple=trans, activewidth=3,
-                    tags="card_highlight")
-            else:
-                self.game_canvas.create_rectangle(
-                    am_rect(6 + (8 + card_w) * 7, 6, card_w + 4, card_h + 4),
-                    outline="#ff0000", fill="#000000", stipple=trans,
-                    activeoutline="#ff0000", activefill="", activestipple=trans, activewidth=3,
-                    tags="card_highlight")
-                if self.game_STATE == "SUPPLY":
-                    for bg in range(0, 7):
-                        if bg < len(self.this_player_cards):
-                            self.game_canvas.create_rectangle(
-                                am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4),
-                                outline="#ff0000", fill="#000000", stipple=trans,
-                                activeoutline="#ff0000", activefill="", activestipple=trans, activewidth=3,
-                                tags="card_highlight")
-                        else:
-                            self.game_canvas.create_rectangle(
-                                am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4),
-                                outline="#00ff00", fill="#000000", stipple=trans,
-                                activeoutline="#00ff00", activefill="", activestipple=trans, activewidth=3,
-                                tags="card_highlight")
+        if len(args) > 0:
+            param = dict(fill="#000000", stipple=trans, activefill="", activestipple=trans, activewidth=3,
+                        tags="card_highlight_sel")
+            param['outline'] =  args[1]
+            param['activeoutline'] =  args[1]
+            for bg in range(0, 7):
+                if bg in args[0]:
+                    self.game_canvas.create_rectangle(
+                        am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), param)
+        else:  #default
+            self.game_canvas.delete("card_highlight_sel")
+            if len(self.this_player_drawcards) > 0:
+                if self.this_player_drawcards[0] == self.card_epidemie or self.game_STATE == "INFECT":
+                    # Epidemie
+                    self.game_canvas.create_rectangle(
+                        am_rect(6 + (8 + card_w) * 7, 6, card_w + 4, card_h + 4),
+                        outline="#00ff00", fill="#000000", stipple=trans,
+                        activeoutline="#00ff00", activefill="", activestipple=trans, activewidth=3,
+                        tags="card_highlight")
+                else:
+                    self.game_canvas.create_rectangle(
+                        am_rect(6 + (8 + card_w) * 7, 6, card_w + 4, card_h + 4),
+                        outline="#ff0000", fill="#000000", stipple=trans,
+                        activeoutline="#ff0000", activefill="", activestipple=trans, activewidth=3,
+                        tags="card_highlight")
+                    if self.game_STATE == "SUPPLY":
+                        for bg in range(0, 7):
+                            if bg < len(self.this_player_cards):
+                                self.game_canvas.create_rectangle(
+                                    am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4),
+                                    outline="#ff0000", fill="#000000", stipple=trans,
+                                    activeoutline="#ff0000", activefill="", activestipple=trans, activewidth=3,
+                                    tags="card_highlight")
+                            else:
+                                self.game_canvas.create_rectangle(
+                                    am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4),
+                                    outline="#00ff00", fill="#000000", stipple=trans,
+                                    activeoutline="#00ff00", activefill="", activestipple=trans, activewidth=3,
+                                    tags="card_highlight")
 
-            self.game_canvas.tag_bind("card_highlight", "<Enter>", self.draw_tooltip)
-            self.game_canvas.tag_bind("card_highlight", "<Leave>", self.dismiss_tooltip)
+                self.game_canvas.tag_bind("card_highlight", "<Enter>", self.draw_tooltip)
+                self.game_canvas.tag_bind("card_highlight", "<Leave>", self.dismiss_tooltip)
 
-    def draw_city_highlight(self, myrange):
+    def draw_city_highlight(self, *args):
         self.game_canvas.delete("city_highlight")
-        for aw in myrange:
-            if aw < 48:
-                c = self.city[aw]
-                card_h = self.section_card - 8
-                s_inf = 320 * self.section_game_w / (3380 * 2)  # variable for marker size (half the size)
-                s_cen = s_inf * 120 / 320
+        if len(args) > 0:
+            for aw in args[0]:
+                if aw < 48:
+                    c = self.city[aw]
+                    card_h = self.section_card - 8
+                    s_inf = 320 * self.section_game_w / (3380 * 2)  # variable for marker size (half the size)
+                    s_cen = s_inf * 120 / 320
 
-                # get anchor-position of city (center)
-                x = int(c.get('posX') * float(int(self.section_game_w)) / 100)
-                y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
-                r = (self.section_game_w * 0.0125)
-                self.game_canvas.create_oval(x - r, y - r, x + r, y + r,
-                                             outline="#00ff00", fill="", activefill="#ff0000", tags="city_highlight")
+                    # get anchor-position of city (center)
+                    x = int(c.get('posX') * float(int(self.section_game_w)) / 100)
+                    y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
+                    r = (self.section_game_w * 0.0125)
+                    self.game_canvas.create_oval(x - r, y - r, x + r, y + r,
+                                                 outline="#00ff00", fill="", activefill="#ff0000",
+                                                 tags="city_highlight")
+                    self.game_canvas.tag_bind("city_highlight", "<ButtonRelease-1>", self.game_click)
 
     def draw_tooltip(self, event):
 
@@ -1707,6 +1649,7 @@ class Client(tk.Tk):
                 14: "c1",
                 15: "c2",
                 17: "execute",
+                32: "Zug beenden",
                 33: "reload"
             }
             (switcher.get(num), "missing")
@@ -1723,7 +1666,10 @@ class Client(tk.Tk):
                 text = "Karte ersetzen"
             if num == 7:
                 if self.this_player_drawcards[0] != self.card_epidemie:
-                    text = "Karte verwerfen"
+                    if self.game_STATE == "SUPPLY":
+                        text = "Karte verwerfen"
+                    if self.game_STATE == "INFECT":
+                        text = "Infizieren"
                 else:
                     text = "Epidemie"
 
@@ -1732,11 +1678,12 @@ class Client(tk.Tk):
 
     def dismiss_tooltip(self, *event):
         self.game_canvas.itemconfigure(self.i_quicktip, fill="")
+    # endregion
+
 
 
 print("START")
-
 app = Client()
 app.mainloop()
-app.request_active = True  # set request_active True to end delay_loop after mainloop() exit
+app.running = False
 print("wait for exit...")
