@@ -14,6 +14,9 @@ import inspect
 
 from Pandemie import libclient
 
+# TODO Aktionskarten
+# TODO Player spezialfunktionen
+# TODO wissen tauschen
 ########################################################################################################################
 update_intervall = 3000
 port = 9999
@@ -173,7 +176,7 @@ def _print(*args):
         print(line + inspect.stack()[1].__getattribute__("function"))
 
 
-class ResizingCanvas(Canvas):   # a subclass of Canvas for dealing with resizing of windows
+class ResizingCanvas(Canvas):  # a subclass of Canvas for dealing with resizing of windows
     def __init__(self, parent, **kwargs):
         Canvas.__init__(self, parent, **kwargs)
         self.bind("<Configure>", self.on_resize)
@@ -204,7 +207,9 @@ class ResizingCanvas(Canvas):   # a subclass of Canvas for dealing with resizing
 
 
 def am_rect(x, y, w, h):
-    return x, y, x+w, y+h
+    return x, y, x + w, y + h
+
+
 # endregion
 
 
@@ -218,11 +223,10 @@ class Client(tk.Tk):
         self.all_player_name = ['-', '-', '-', '-']
         self.all_player_role = [0, 0, 0, 0]
         self.all_player_pos = [2, 2, 2, 2]  # start in Atlanta
+        self.all_player_cards = [[], [], [], []]
 
         self.this_player_num = 0
         self.this_player_name = ''
-        self.this_player_role = 0
-        self.this_player_pos = 2
         self.this_player_cards = []
         self.this_player_card_selection = []
         self.this_player_drawcards = []
@@ -262,6 +266,7 @@ class Client(tk.Tk):
         self.supplies = 0  # playercard-pile
         self.infection = [24, 24, 24, 24]  # 0-24
         self.healing = [0, 0, 0, 0]  # 0 = active,  1 = healed,  2 = exterminated
+        # TODO healing icons twisted
         self.card_epidemie = 53
         self.gameupdatelist = {'city': [], 'cards': [], 'marker1': 0, 'marker2': 0, 'playerpos': 0}
 
@@ -272,54 +277,103 @@ class Client(tk.Tk):
         self.section_status = 0
         self.section_action = 0
 
-        self.city = [{'ID':  0, 'posX':  5.2, 'posY': 24.4, 'farbe': 0, 'con': [ 1, 12, 39, 46],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'San Francisco'},
-                     {'ID':  1, 'posX': 14.7, 'posY': 18.5, 'farbe': 0, 'con': [0, 12, 13,  2,  3],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Chicago'},
-                     {'ID':  2, 'posX': 17.4, 'posY': 30.2, 'farbe': 0, 'con': [1,  5, 14],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pincity': 0, 'name': 'Atlanta'},
-                     {'ID':  3, 'posX': 22.1, 'posY': 18.0, 'farbe': 0, 'con': [1,  5,  4],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Montréal'},
-                     {'ID':  4, 'posX': 27.8, 'posY': 19.9, 'farbe': 0, 'con': [3,  5,  6,  7],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'New York'},
-                     {'ID':  5, 'posX': 25.3, 'posY': 29.4, 'farbe': 0, 'con': [ 4,  3,  2, 14],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Washington'},
-                     {'ID':  6, 'posX': 40.6, 'posY': 25.9, 'farbe': 0, 'con': [ 4, 19, 24,  8,  7],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Madrid'},
-                     {'ID':  7, 'posX': 41.6, 'posY': 10.3, 'farbe': 0, 'con': [ 4,  6,  8,  9],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'London'},
-                     {'ID':  8, 'posX': 47.2, 'posY': 18.1, 'farbe': 0, 'con': [ 7,  6, 24, 10,  9],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Paris'},
-                     {'ID':  9, 'posX': 49.1, 'posY':  7.2, 'farbe': 0, 'con': [ 7,  8, 10, 11],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Essen'},
-                     {'ID': 10, 'posX': 52.2, 'posY': 15.1, 'farbe': 0, 'con': [ 9,  8, 26],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Mailand'},
-                     {'ID': 11, 'posX': 57.3, 'posY':  4.3, 'farbe': 0, 'con': [ 9, 26, 27],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'St. Petersburg'},
-                     {'ID': 12, 'posX':  6.8, 'posY': 40.1, 'farbe': 1, 'con': [47, 13,  1,  0],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Los Angeles'},
-                     {'ID': 13, 'posX': 13.6, 'posY': 45.4, 'farbe': 1, 'con': [12, 16, 15, 14,  1],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Mexico Stadt'},
-                     {'ID': 14, 'posX': 22.2, 'posY': 42.9, 'farbe': 1, 'con': [13, 15,  5,  2],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Miami'},
-                     {'ID': 15, 'posX': 21.5, 'posY': 58.7, 'farbe': 1, 'con': [13, 16, 18, 19, 14],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bogotá'},
-                     {'ID': 16, 'posX': 18.9, 'posY': 75.7, 'farbe': 1, 'con': [13, 17, 15],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Lima'},
-                     {'ID': 17, 'posX': 19.9, 'posY': 93.5, 'farbe': 1, 'con': [16],                        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Santiago'},
-                     {'ID': 18, 'posX': 27.7, 'posY': 90.3, 'farbe': 1, 'con': [15, 19],                    'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Buenos Aires'},
-                     {'ID': 19, 'posX': 32.0, 'posY': 78.2, 'farbe': 1, 'con': [15, 18, 20,  6],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Sao Paulo'},
-                     {'ID': 20, 'posX': 46.5, 'posY': 55.8, 'farbe': 1, 'con': [19, 21, 23],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Lagos'},
-                     {'ID': 21, 'posX': 51.0, 'posY': 66.3, 'farbe': 1, 'con': [20, 22, 23],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kinshasa'},
-                     {'ID': 22, 'posX': 55.4, 'posY': 82.6, 'farbe': 1, 'con': [21, 23],                    'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Johannisburg'},
-                     {'ID': 23, 'posX': 56.0, 'posY': 53.0, 'farbe': 1, 'con': [20, 21, 22, 25],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Khartum'},
-                     {'ID': 24, 'posX': 48.7, 'posY': 34.6, 'farbe': 2, 'con': [ 6, 25, 26,  8],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Algier'},
-                     {'ID': 25, 'posX': 54.4, 'posY': 37.5, 'farbe': 2, 'con': [24, 23, 29, 28, 26],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kairo'},
-                     {'ID': 26, 'posX': 55.5, 'posY': 24.3, 'farbe': 2, 'con': [24, 25, 28, 27, 11, 10],    'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Istanbul'},
-                     {'ID': 27, 'posX': 61.3, 'posY': 15.0, 'farbe': 2, 'con': [11, 26, 30],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Moskau'},
-                     {'ID': 28, 'posX': 60.7, 'posY': 32.3, 'farbe': 2, 'con': [26, 25, 29, 31, 30],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bagdad'},
-                     {'ID': 29, 'posX': 61.6, 'posY': 46.8, 'farbe': 2, 'con': [25, 31, 28],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Riad'},
-                     {'ID': 30, 'posX': 66.3, 'posY': 22.5, 'farbe': 2, 'con': [27, 28, 31, 33],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Teheran'},
-                     {'ID': 31, 'posX': 67.9, 'posY': 37.9, 'farbe': 2, 'con': [28, 29, 32, 33, 30],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Karatschi'},
-                     {'ID': 32, 'posX': 68.5, 'posY': 49.3, 'farbe': 2, 'con': [31, 34, 33],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Mumbai'},
-                     {'ID': 33, 'posX': 73.3, 'posY': 33.1, 'farbe': 2, 'con': [30, 31, 32, 34, 35],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Delhi'},
-                     {'ID': 34, 'posX': 74.3, 'posY': 57.5, 'farbe': 2, 'con': [32, 44, 40, 35, 33],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Chennai'},
-                     {'ID': 35, 'posX': 78.5, 'posY': 36.9, 'farbe': 2, 'con': [33, 34, 40, 41],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kalkutta'},
-                     {'ID': 36, 'posX': 82.6, 'posY': 18.6, 'farbe': 3, 'con': [37, 38],                    'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Peking'},
-                     {'ID': 37, 'posX': 89.3, 'posY': 18.0, 'farbe': 3, 'con': [36, 38, 39],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Seoul'},
-                     {'ID': 38, 'posX': 83.2, 'posY': 29.9, 'farbe': 3, 'con': [36, 41, 42, 39, 37],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Shanghai'},
-                     {'ID': 39, 'posX': 94.5, 'posY': 24.3, 'farbe': 3, 'con': [37, 38, 43,  0],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Tokyo'},
-                     {'ID': 40, 'posX': 79.6, 'posY': 50.3, 'farbe': 3, 'con': [34, 44, 45, 41, 35],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bangkok'},
-                     {'ID': 41, 'posX': 83.9, 'posY': 43.1, 'farbe': 3, 'con': [35, 40, 45, 46, 42, 38],    'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Hong Kong'},
-                     {'ID': 42, 'posX': 89.8, 'posY': 41.0, 'farbe': 3, 'con': [41, 46, 43, 38],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Taipeh'},
-                     {'ID': 43, 'posX': 95.1, 'posY': 36.1, 'farbe': 3, 'con': [39, 42],                    'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Osaka'},
-                     {'ID': 44, 'posX': 79.5, 'posY': 71.1, 'farbe': 3, 'con': [34, 47, 45, 40],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Jakarta'},
-                     {'ID': 45, 'posX': 84.2, 'posY': 61.4, 'farbe': 3, 'con': [44, 46, 41, 40],            'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Ho-Chi-MinH-Stadt'},
-                     {'ID': 46, 'posX': 91.4, 'posY': 60.6, 'farbe': 3, 'con': [45, 47,  0, 42, 41],        'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Manila'},
-                     {'ID': 47, 'posX': 95.6, 'posY': 93.1, 'farbe': 3, 'con': [46, 44, 12],                'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Sydney'}]
+        self.city = [
+            {'ID': 0, 'posX': 5.2, 'posY': 24.4, 'farbe': 0, 'con': [1, 12, 39, 46], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'San Francisco'},
+            {'ID': 1, 'posX': 14.7, 'posY': 18.5, 'farbe': 0, 'con': [0, 12, 13, 2, 3], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Chicago'},
+            {'ID': 2, 'posX': 17.4, 'posY': 30.2, 'farbe': 0, 'con': [1, 5, 14], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 1, 'pincity': 0, 'name': 'Atlanta'},
+            {'ID': 3, 'posX': 22.1, 'posY': 18.0, 'farbe': 0, 'con': [1, 5, 4], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Montréal'},
+            {'ID': 4, 'posX': 27.8, 'posY': 19.9, 'farbe': 0, 'con': [3, 5, 6, 7], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'New York'},
+            {'ID': 5, 'posX': 25.3, 'posY': 29.4, 'farbe': 0, 'con': [4, 3, 2, 14], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Washington'},
+            {'ID': 6, 'posX': 40.6, 'posY': 25.9, 'farbe': 0, 'con': [4, 19, 24, 8, 7], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Madrid'},
+            {'ID': 7, 'posX': 41.6, 'posY': 10.3, 'farbe': 0, 'con': [4, 6, 8, 9], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'London'},
+            {'ID': 8, 'posX': 47.2, 'posY': 18.1, 'farbe': 0, 'con': [7, 6, 24, 10, 9], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Paris'},
+            {'ID': 9, 'posX': 49.1, 'posY': 7.2, 'farbe': 0, 'con': [7, 8, 10, 11], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Essen'},
+            {'ID': 10, 'posX': 52.2, 'posY': 15.1, 'farbe': 0, 'con': [9, 8, 26], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Mailand'},
+            {'ID': 11, 'posX': 57.3, 'posY': 4.3, 'farbe': 0, 'con': [9, 26, 27], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'St. Petersburg'},
+            {'ID': 12, 'posX': 6.8, 'posY': 40.1, 'farbe': 1, 'con': [47, 13, 1, 0], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Los Angeles'},
+            {'ID': 13, 'posX': 13.6, 'posY': 45.4, 'farbe': 1, 'con': [12, 16, 15, 14, 1], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Mexico Stadt'},
+            {'ID': 14, 'posX': 22.2, 'posY': 42.9, 'farbe': 1, 'con': [13, 15, 5, 2], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Miami'},
+            {'ID': 15, 'posX': 21.5, 'posY': 58.7, 'farbe': 1, 'con': [13, 16, 18, 19, 14], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bogotá'},
+            {'ID': 16, 'posX': 18.9, 'posY': 75.7, 'farbe': 1, 'con': [13, 17, 15], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Lima'},
+            {'ID': 17, 'posX': 19.9, 'posY': 93.5, 'farbe': 1, 'con': [16], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Santiago'},
+            {'ID': 18, 'posX': 27.7, 'posY': 90.3, 'farbe': 1, 'con': [15, 19], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Buenos Aires'},
+            {'ID': 19, 'posX': 32.0, 'posY': 78.2, 'farbe': 1, 'con': [15, 18, 20, 6], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Sao Paulo'},
+            {'ID': 20, 'posX': 46.5, 'posY': 55.8, 'farbe': 1, 'con': [19, 21, 23], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Lagos'},
+            {'ID': 21, 'posX': 51.0, 'posY': 66.3, 'farbe': 1, 'con': [20, 22, 23], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Kinshasa'},
+            {'ID': 22, 'posX': 55.4, 'posY': 82.6, 'farbe': 1, 'con': [21, 23], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Johannisburg'},
+            {'ID': 23, 'posX': 56.0, 'posY': 53.0, 'farbe': 1, 'con': [20, 21, 22, 25], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Khartum'},
+            {'ID': 24, 'posX': 48.7, 'posY': 34.6, 'farbe': 2, 'con': [6, 25, 26, 8], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Algier'},
+            {'ID': 25, 'posX': 54.4, 'posY': 37.5, 'farbe': 2, 'con': [24, 23, 29, 28, 26], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kairo'},
+            {'ID': 26, 'posX': 55.5, 'posY': 24.3, 'farbe': 2, 'con': [24, 25, 28, 27, 11, 10], 'i0': 0, 'i1': 0,
+             'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Istanbul'},
+            {'ID': 27, 'posX': 61.3, 'posY': 15.0, 'farbe': 2, 'con': [11, 26, 30], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Moskau'},
+            {'ID': 28, 'posX': 60.7, 'posY': 32.3, 'farbe': 2, 'con': [26, 25, 29, 31, 30], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bagdad'},
+            {'ID': 29, 'posX': 61.6, 'posY': 46.8, 'farbe': 2, 'con': [25, 31, 28], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Riad'},
+            {'ID': 30, 'posX': 66.3, 'posY': 22.5, 'farbe': 2, 'con': [27, 28, 31, 33], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Teheran'},
+            {'ID': 31, 'posX': 67.9, 'posY': 37.9, 'farbe': 2, 'con': [28, 29, 32, 33, 30], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Karatschi'},
+            {'ID': 32, 'posX': 68.5, 'posY': 49.3, 'farbe': 2, 'con': [31, 34, 33], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Mumbai'},
+            {'ID': 33, 'posX': 73.3, 'posY': 33.1, 'farbe': 2, 'con': [30, 31, 32, 34, 35], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Delhi'},
+            {'ID': 34, 'posX': 74.3, 'posY': 57.5, 'farbe': 2, 'con': [32, 44, 40, 35, 33], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Chennai'},
+            {'ID': 35, 'posX': 78.5, 'posY': 36.9, 'farbe': 2, 'con': [33, 34, 40, 41], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kalkutta'},
+            {'ID': 36, 'posX': 82.6, 'posY': 18.6, 'farbe': 3, 'con': [37, 38], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Peking'},
+            {'ID': 37, 'posX': 89.3, 'posY': 18.0, 'farbe': 3, 'con': [36, 38, 39], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Seoul'},
+            {'ID': 38, 'posX': 83.2, 'posY': 29.9, 'farbe': 3, 'con': [36, 41, 42, 39, 37], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Shanghai'},
+            {'ID': 39, 'posX': 94.5, 'posY': 24.3, 'farbe': 3, 'con': [37, 38, 43, 0], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Tokyo'},
+            {'ID': 40, 'posX': 79.6, 'posY': 50.3, 'farbe': 3, 'con': [34, 44, 45, 41, 35], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bangkok'},
+            {'ID': 41, 'posX': 83.9, 'posY': 43.1, 'farbe': 3, 'con': [35, 40, 45, 46, 42, 38], 'i0': 0, 'i1': 0,
+             'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Hong Kong'},
+            {'ID': 42, 'posX': 89.8, 'posY': 41.0, 'farbe': 3, 'con': [41, 46, 43, 38], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Taipeh'},
+            {'ID': 43, 'posX': 95.1, 'posY': 36.1, 'farbe': 3, 'con': [39, 42], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Osaka'},
+            {'ID': 44, 'posX': 79.5, 'posY': 71.1, 'farbe': 3, 'con': [34, 47, 45, 40], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Jakarta'},
+            {'ID': 45, 'posX': 84.2, 'posY': 61.4, 'farbe': 3, 'con': [44, 46, 41, 40], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Ho-Chi-MinH-Stadt'},
+            {'ID': 46, 'posX': 91.4, 'posY': 60.6, 'farbe': 3, 'con': [45, 47, 0, 42, 41], 'i0': 0, 'i1': 0, 'i2': 0,
+             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Manila'},
+            {'ID': 47, 'posX': 95.6, 'posY': 93.1, 'farbe': 3, 'con': [46, 44, 12], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
+             'center': 0, 'pincity': 0, 'name': 'Sydney'}]
 
         # endregion
 
@@ -428,10 +482,10 @@ class Client(tk.Tk):
 
         # endregion
 
-# region ###### UI #####################################################################################################
+    # region ###### UI #####################################################################################################
     def window_00_load(self):
 
-        if self.ctrl_res_load[0] == 0:   # INIT
+        if self.ctrl_res_load[0] == 0:  # INIT
             _print()
             self.LOADframe.pack()
             self.load_canvas.pack()
@@ -440,20 +494,20 @@ class Client(tk.Tk):
             thread1 = threading.Thread(target=self.window_00_load_async)
             thread1.start()
 
-        if self.ctrl_res_load[2] == 1:   # switch text after connectiondata is loaded
+        if self.ctrl_res_load[2] == 1:  # switch text after connectiondata is loaded
             self.load_canvas.delete("loadingtext")
             self.load_canvas.create_text(8, 70, text='loading resources...', anchor='sw', tags="loadingtext")
             self.ctrl_res_load[2] = 2
 
-        if self.ctrl_res_load[2] == 2:   # load rescources and display bar
+        if self.ctrl_res_load[2] == 2:  # load rescources and display bar
             x0, y0, x1, y1 = self.load_canvas.coords(self.loading_bar)
             self.load_canvas.coords(
-                self.loading_bar, x0, y0, (512-21) * self.ctrl_res_load[0] / self.ctrl_res_load[1] + 5, y1)
+                self.loading_bar, x0, y0, (512 - 21) * self.ctrl_res_load[0] / self.ctrl_res_load[1] + 5, y1)
 
-        if self.ctrl_res_load[2] == 3:                           # leave loop and start connection window
+        if self.ctrl_res_load[2] == 3:  # leave loop and start connection window
             # self.set_after(self.window_01_connect, 500)
             self.after(500, self.window_01_connect)
-        else:                                         # loop self
+        else:  # loop self
             # self.set_after(self.window_00_load, 1)
             self.after(1, self.window_00_load)
 
@@ -468,7 +522,7 @@ class Client(tk.Tk):
         self.ctrl_res_load[2] = 1
 
         #                     [0] increment
-        self.ctrl_res_load[1] = 80   # [1] total number of elements to load
+        self.ctrl_res_load[1] = 80  # [1] total number of elements to load
         #                     [2] boolean to 1 when ready
 
         self.img_map_raw = Image.open(res_path + "mat/world.png")
@@ -564,7 +618,7 @@ class Client(tk.Tk):
         self.entry4.pack(side="left")
 
         self.btn_con.focus_set()
-        self.btn_con.bind('<Return>', self.window_02b_recon)    # TODO DELETE THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        self.btn_con.bind('<Return>', self.window_02b_recon)  # TODO DELETE THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         # self.btn_con.bind('<Return>', self.window_02a_game_prep)  # TODO UNCOMMENT THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!
 
     def window_02a_game_prep(self, *event):
@@ -590,9 +644,9 @@ class Client(tk.Tk):
         self.lbl_head_role.grid(row=1, column=4, padx=5, pady=0, sticky=W)
 
         for p in range(0, 4):
-            self.lbl_player_name[p].grid(row=2+p, column=3, padx=5, pady=5, sticky=E)
-            self.lbl_player_func[p].grid(row=2+p, column=4, padx=5, pady=5, sticky=E)
-            self.lbl_player_rdy[p].grid(row=2+p, column=5, padx=5, pady=5, sticky=E)
+            self.lbl_player_name[p].grid(row=2 + p, column=3, padx=5, pady=5, sticky=E)
+            self.lbl_player_func[p].grid(row=2 + p, column=4, padx=5, pady=5, sticky=E)
+            self.lbl_player_rdy[p].grid(row=2 + p, column=5, padx=5, pady=5, sticky=E)
 
         self.start_main()
 
@@ -657,9 +711,10 @@ class Client(tk.Tk):
         self.send_request()
         self.running = True
         threading.Thread(target=self.delay_request).start()
-# endregion
 
-# region ###### connection #############################################################################################
+    # endregion
+
+    # region ###### connection #########################################################################################
     def start_connection(self, shost, sport, request):
         addr = (shost, sport)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -721,12 +776,18 @@ class Client(tk.Tk):
                     break
         except KeyboardInterrupt:
             print("caught keyboard interrupt, exiting")
-# endregion
 
-# region ###### game ###################################################################################################
+    # endregion
+
+    # region ###### game ###################################################################################################
     def game_engine(self, m_response):
         m_version = m_response.get("v") if "v" in m_response else None
         _print(str(m_response), self.game_STATE)
+
+        # update game button
+        if self.this_player_turns['turn'] == 33 and self.this_player_turns['sender'] == "BTN":
+            self.draw_city_highlight()
+            self.localversion = 0
 
         # region MANAGE requests #######################################################################################
         if m_response.get("response"):
@@ -736,8 +797,7 @@ class Client(tk.Tk):
                 "player_set": self.game_init_player_set,
                 "recon": self.game_init_recon,
                 "update": self.game_update,
-                #"new_cards": self.receive_card,
-                #"next_player": self.next_player,
+                "new_cards": self.receive_card,
                 # GLOBAL RESPONSE - STATE-CHANGE ----------------------------------------
                 "GAME": self.game_init_execute_game,
                 "LOSE_GAME": self.game_lose,
@@ -780,16 +840,6 @@ class Client(tk.Tk):
                 print("FAILURE: Game Engine - No response")
         # endregion
         # region MANAGE state ##########################################################################################
-        # region ###### info ######
-        # INIT:             pre game
-        # WAIT:             awaits game start (Player rdy)
-        # -> game execute set to PASSIV and start game
-        # PASSIV
-        # ACTION
-        # SUPPLY
-        # EPIDEMIE (optional)
-        # INFECT
-        # endregion
 
         if self.game_STATE == "PASSIV":  # awaits turn
             if self.current_player == self.this_player_num:  # init STATE: action
@@ -801,7 +851,7 @@ class Client(tk.Tk):
                 self.txt_status = self.all_player_name[self.current_player] + " ist am Zug."
 
         if self.game_STATE == "ACTION":
-            # awaits click to set action, execute action:
+            # awaits click to set action, execute action, STATE ends when turns_left = 0
             if self.this_player_turns["turns_left"] > 0:
                 # region ###### set statustext ######
                 if self.this_player_turns["turns_left"] > 1:
@@ -810,9 +860,172 @@ class Client(tk.Tk):
                 else:
                     self.txt_status = "Aktionsphase: Eine Aktion verbleibend."
                 # endregion
-                #args 0 :  self.this_player_turns['city']
-                #args 1 :  self.this_player_turns['steps']
-                # region ###### actions: ######
+                # region ###### actions ######
+                # ---  3 - build center ------------------------------------------------------------------------------ #
+                if self.this_player_turns['turn'] == 3:
+                    if self.this_player_turns['sender'] != "":
+                        # init var
+                        pos = self.all_player_pos[self.this_player_num]
+                        center = []
+                        for anz, c in enumerate(self.city):
+                            if c.get("center"):
+                                center.append(anz)
+
+                        if pos in self.this_player_cards or \
+                                self.all_player_role[self.this_player_num] == 7:  # betriebsexperte
+
+                            if self.city[pos]['center'] != 1:
+                                if len(center) < 6:  # build new center
+                                    # update game
+                                    self.this_player_turns['turns_left'] -= 1
+                                    # update server
+                                    self.value = {'player': self.this_player_num,
+                                                  'center_new': pos,
+                                                  'center_removed': None,
+                                                  'cards': self.this_player_cards}
+                                    self._update('center')
+                                else:  # move existing center
+                                    if self.this_player_turns['sender'] == "BTN":  # highlight for movement
+                                        self.draw_city_highlight(center)
+                                        self.txt_action = "Wähle Center zum verschieben"
+                                    if self.this_player_turns['sender'] == "CITY":  # move center
+                                        # update game
+                                        self.this_player_turns['turns_left'] -= 1
+                                        # update server
+                                        self.value = {'player': self.this_player_num,
+                                                      'center_new': pos,
+                                                      'center_removed': self.this_player_turns['city'],
+                                                      'cards': self.this_player_cards}
+                                        self._update('center')
+                            else:
+                                self.txt_action = "Nur ein Forschungscenter möglich."
+                        else:
+                            self.txt_action = "Stadtkarte benötigt"
+                # ---  4 - cure disease ------------------------------------------------------------------------------ #
+                if self.this_player_turns['turn'] == 4:
+                    if self.this_player_turns['sender'] == "BTN":
+                        check = 0
+                        for c in range(0, 4):
+                            if self.city[self.all_player_pos[self.this_player_num]]['i' + str(c)] > 0:
+                                check += 1
+                                dis = c
+                        if check == 0:
+                            self.txt_action = "Keine Krankheit zu behandeln."
+                        elif check == 1:
+                            # only 1 disease in city
+                            # update game
+                            self.this_player_turns['turns_left'] -= 1
+                            # update server
+                            self.value = {'player': self.this_player_num,
+                                          'disease': dis}
+                            self._update('update_inf')
+                        else:
+                            # several diseases, select wich to cure
+                            self.draw_disease_selection(self.all_player_pos[self.this_player_num])
+                    if self.this_player_turns['sender'] == "DIS_":
+                        # update game
+                        self.draw_disease_selection()
+                        self.this_player_turns['turns_left'] -= 1
+                        # update server
+                        self.value = {'player': self.this_player_num,
+                                      'disease': self.this_player_turns['disease']}
+                        self._update('update_inf')
+                # ---  5 - share knowledge --------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 5:
+                    if self.this_player_turns['sender'] == "BTN":
+                        player = []
+                        for num, p in enumerate(self.all_player_pos):
+                            if p == self.all_player_pos[self.this_player_num]:
+                                player.append(num)
+
+                        if len(player) > 1:
+                            send_c = []
+                            if self.all_player_role[self.this_player_num] == 4:  # forscherin
+                                for c in self.this_player_cards:
+                                    if c < 48:
+                                        send_c.append(c)
+                            elif self.all_player_pos[self.this_player_num] in self.this_player_cards:
+                                send_c.append(self.all_player_pos[self.this_player_num])
+
+                            get_c = []
+                            for p in player:
+                                if p != self.this_player_num:
+                                    if self.all_player_role[p] == 4:  # forscherin
+                                        for c in self.all_player_cards[p]:
+                                            if c < 48:
+                                                get_c.append(c)
+                                    elif self.all_player_pos[self.this_player_num] in self.all_player_cards[p]:
+                                        get_c.append(self.all_player_pos[self.this_player_num])
+
+                            if len(get_c) == 0 and len(send_c) == 0:
+                                self.txt_action = "Keine Karten zu tauschen"
+                            else:
+                                pass
+                            # TODO Karten tauschen
+
+                        else:
+                            self.txt_action = "Kein anderer Spieler in deiner Stadt."
+
+                        # city card = pos player a = pos player b
+                        # forscherin: (4) beliebige karte GEBEN
+                        pass
+
+                # ---  6 - healing ----------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 6:
+                    if self.this_player_turns['sender'] == "BTN":
+                        if self.city[self.all_player_pos[self.this_player_num]].get("center"):
+                            self.this_player_card_selection = []
+                            check = [0, 0, 0, 0]
+                            for c in self.this_player_cards:
+                                if c <= 47:
+                                    check[self.city[c].get("farbe")] += 1
+                            for idf, f in enumerate(check):
+                                if f > 4 or (self.all_player_role[self.this_player_num] == 1 and f > 3):
+                                    if self.healing[idf] == 0:
+                                        selection = []
+                                        for idc, c in enumerate(self.this_player_cards):
+                                            if self.city[c].get("farbe") == idf:
+                                                selection.append(idc)
+
+                                        # self.this_player_turns['target'] = idf
+                                        if self.all_player_role[self.this_player_num] == 1:
+                                            self.txt_action = "Wähle 4 Karten aus."
+                                        else:
+                                            self.txt_action = "Wähle 5 Karten aus."
+                                        self.draw_card_highlight(selection, "#ff0000")
+                                        break
+                                    else:
+                                        self.txt_action = "Heilmittel bereits erforscht"
+                                else:
+                                    self.txt_action = "Nicht genug Karten von einer Farbe"
+                        else:
+                            self.txt_action = "Forschungscenter benötigt"
+                    if self.this_player_turns['sender'] == "CARD":
+                        c_num = self.this_player_turns['card']
+                        if c_num in self.this_player_card_selection:
+                            self.this_player_card_selection.remove(c_num)
+                            self.draw_card_highlight([c_num], "#ff0000")
+                        else:
+                            self.this_player_card_selection.append(c_num)
+                            self.draw_card_highlight([c_num], "#00ff00")
+
+                        required = 4 if self.all_player_role[self.this_player_num] == 1 else 5
+
+                        if len(self.this_player_card_selection) < required:
+                            self.txt_action = str(len(self.this_player_card_selection)) + "/" + \
+                                              str(required) + " Karten ausgewählt"
+                        else:
+                            self.txt_action = "Heilmittel entdeckt."
+                            # update game
+                            self.this_player_turns['turns_left'] -= 1
+                            # update server
+                            remove_cards = []
+                            for c in self.this_player_card_selection:
+                                remove_cards.append(self.this_player_cards[c])
+                            self.value = {'player': self.this_player_num,
+                                          'cards': remove_cards}
+                            self.this_player_card_selection = []
+                            self._update('heal')
                 # --- 10 - move -------------------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 10:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
@@ -885,50 +1098,162 @@ class Client(tk.Tk):
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': []}
                         self._update('player_move')
-                # --- reset sender ----------------------------------------------------------------------------------- #
-                self.this_player_turns['sender'] = ""
+                # --- 32 - end turn ---------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 32 and self.this_player_turns['sender'] == "BTN":
+                    self.this_player_turns = {'sender': "", 'turn': 99, 'turns_left': 0}
+                    self.txt_action = ""
+                    self.game_STATE = "SUPPLY"
                 # endregion
-            else:  # action is over init next STATE
-                self.this_player_turns["turn"] = 0
-                self.txt_action = ""
-                self.value = self.this_player_num
-                self._update('draw_playercard')
+            else:  # ACTION is over start next STATE
+                # remove all highlights
+                self.draw_city_highlight()
+                self.draw_disease_selection()
 
+                self.this_player_turns["turn"] = 99
+                self.txt_action = ""
+                self.game_STATE = "SUPPLY"
+
+        if self.game_STATE == "SUPPLY":
+            # awaits click on cards, execute supply, STATE ends when draw_cards = 0
+            if len(self.this_player_drawcards) > 0 or self.this_player_turns["turn"] >= 100:
+                # region ###### set statustext ######
+                if self.this_player_drawcards[0] != self.card_epidemie:
+                    if len(self.this_player_drawcards) > 1:
+                        self.txt_status = "Nachschubphase: 2 Karten ziehen"
+                    else:
+                        self.txt_status = "Nachschubphase: 1 Karten ziehen"
+                    if self.this_player_turns["turn"] >= 100:
+                        self.txt_status = "Infizieren."
+                else:
+                    self.txt_status = "Epidemie auslösen."
+                # endregion
+                # region ###### actions ######
+                # --- drawcard --------------------------------------------------------------------------------------- #
+                if self.this_player_drawcards[0] != self.card_epidemie and self.this_player_turns["turn"] < 100:
+                    if self.this_player_turns['sender'] == "CARD":
+                        playercard_add = []
+                        playercard_remove = []
+                        playercard_switch = []
+                        playercard_burn = []
+                        if 7 > self.this_player_turns['card'] >= len(self.this_player_cards):  # add card to player
+                            playercard_add.append(self.this_player_drawcards[0])
+                        elif self.this_player_turns['card'] == 7:  # dismiss card
+                            playercard_burn.append(self.this_player_drawcards[0])
+                        else:  # replace card
+                            playercard_switch.append((self.this_player_cards[self.this_player_turns['card']],
+                                                      self.this_player_drawcards[0]))
+
+                        del self.this_player_drawcards[0]
+                        self.gameupdatelist['cards'].append(7)
+                        # self.receive_card()  # update drawcards
+                        # update server
+                        self.value = {'player': self.this_player_num,
+                                      'add': playercard_add,
+                                      'remove': playercard_remove,
+                                      'switch': playercard_switch,
+                                      'burn': playercard_burn}
+                        self._update('update_cards')
+                # --- epidemie --------------------------------------------------------------------------------------- #
+                else:
+                    # start epidemie and draw infection card
+                    if self.this_player_turns["turn"] == 0 and self.this_player_turns['sender'] == "CARD":
+                        print(">>> EPIDEMIE >>>", str(self.this_player_drawcards))
+                        self.game_canvas.itemconfigure(self.i_quicktip, fill="")
+                        self.txt_action = ""
+                        self.this_player_turns["turn"] = 100
+                        self.value = self.this_player_num
+                        del self.this_player_drawcards[0]
+                        print(">>> EPIDEMIE >>>", str(self.this_player_drawcards))
+                        self.this_player_turns['sender'] = ""
+                        self._update('draw_epidemiecard')
+                    # infect city
+                    if self.this_player_turns["turn"] == 100 and self.this_player_turns['sender'] == "CARD":
+                        print("zug")
+                        inf_card = self.this_player_drawcards[0]
+                        del self.this_player_drawcards[0]
+                        self.gameupdatelist['cards'].append(7)
+                        self.this_player_turns["turn"] = 0
+                        # update server -> do calculation online
+                        self.value = {'card': inf_card, 'epidemie': True}
+                        self._update('update_inf')
+                # endregion
+            else:
+                # INIT SUPPLY with drawing cards
+                if self.this_player_turns["turn"] == 99:
+                    self.this_player_turns["turn"] = 0
+                    self.value = self.this_player_num
+                    self._update('draw_playercard')
+                # SUPPLY is over start next STATE
+                else:
+                    self.this_player_turns["turn"] = 999
+                    self.txt_action = ""
+                    self.game_canvas.itemconfigure(self.i_quicktip, fill="")
+                    self.game_STATE = "INFECT"
+
+        if self.game_STATE == "INFECT":
+            # awaits click on cards, execute supply, STATE ends when draw_cards = 0
+            if len(self.this_player_drawcards) > 0:
+                # region ###### set statustext ######
+                self.txt_action = "Infiziere Stadt"
+                # endregion
+                # region ###### actions ######
+                if self.this_player_turns['sender'] == "CARD":
+                    inf_card = self.this_player_drawcards[0]
+                    del self.this_player_drawcards[0]
+                    self.gameupdatelist['cards'].append(7)
+
+                    # update server -> do calculation online
+                    self.value = {'card': inf_card}
+                    self._update('update_inf')
+                # endregion
+            else:
+                # INIT INFECT with drawing cards
+                if self.this_player_turns["turn"] == 999:
+                    self.this_player_turns["turn"] = 0
+                    self.value = self.this_player_num
+                    self._update('draw_infcard')
+                # INFECT is over start next STATE -> next player
+                else:
+                    self.this_player_turns = {'sender': "", 'turn': 0, 'turns_left': 0}
+                    self.txt_action = ""
+                    self.txt_status = ""
+                    self.game_canvas.itemconfigure(self.i_quicktip, fill="")
+                    self.game_STATE = "PASSIV"
+                    self.value = self.this_player_num
+                    self._update('turn_over')
 
         # endregion
 
+        # --- reset sender ----------------------------------------------------------------------------------- #
+        self.this_player_turns['sender'] = ""
         # update game if necessary
         if self.game_STATE != 'INIT' and self.game_STATE != 'WAIT':
             self.game_show()
 
-    def game_click(self, event):
+    def game_click(self, event, *args):
         if not self.block_request:
             # region ###### CLICK @ CARDS ##############################################################################
             if 8 < event.y < self.section_card:  # cardsection
                 card_num = math.floor(float(event.x) / (self.section_game_w / 8))
                 _print("clicked at Card: " + str(card_num))
+                self.this_player_turns['sender'] = "CARD"
+                self.this_player_turns['card'] = card_num
             # endregion
             # region ###### CLICK @ FIELD ##############################################################################
             elif self.section_field > event.y > self.section_card + 8:  # map -> find city
-                # find city
-                dist = 32000
-                mycity = ""
-                mycitynum = 0
-                fy = (event.y - (self.section_card + 8))  # y-pos on field
-                for c in self.city:
-                    if (0 + abs(c.get("posX") * self.section_game_w / 100 - event.x) +
-                            abs(c.get("posY") * self.section_game_w / 100 / 2.125 - fy)) < dist:
-                        dist = (abs(c.get("posX") * self.section_game_w / 100 - event.x) +
-                                abs(c.get("posY") * self.section_game_w / 100 / 2.125 - fy))
-                        mycity = c.get("name")
-                        mycitynum = c.get("ID")
-                #if dist < (self.section_game_w / 100 * 3):
-                _print("clicked at City: " + mycity)
-                self.this_player_turns['sender'] = "CITY"
-                self.this_player_turns['city'] = mycitynum
-                self.this_player_turns['steps'] = len(self.get_player_path(mycitynum))
 
+                sender = str(args[0][:4])
+                if sender == "CITY":  # clicked on city
+                    mycitynum = int(args[0][4:])
+                    mycity = self.city[mycitynum].get("name")
+                    _print("clicked at City: " + mycity)
+                    self.this_player_turns['city'] = mycitynum
+                    self.this_player_turns['steps'] = len(self.get_player_path(mycitynum))
 
+                if sender == "DIS_":  # clicked on disease-selection
+                    self.this_player_turns['disease'] = int(args[0][4:])
+
+                self.this_player_turns['sender'] = sender
             # endregion
             # region ###### CLICK @ BAR/BTN ############################################################################
             elif event.y > self.section_field + 8:
@@ -948,7 +1273,7 @@ class Client(tk.Tk):
 
             self._update()
 
-# region ------ INIT ---------------------------------------------------------------------------------------------------
+    # region ------ INIT ---------------------------------------------------------------------------------------------------
     def game_init_update(self, args):
         def get_role_name(num):
             switcher = {
@@ -982,7 +1307,7 @@ class Client(tk.Tk):
         _print()
 
         # playernum
-        self.this_player_num = args.get("player_num")    # [0..4]
+        self.this_player_num = args.get("player_num")  # [0..4]
         print("player_set: thisplayer_num:", str(self.this_player_num))
 
         # player_name / player role
@@ -1022,8 +1347,8 @@ class Client(tk.Tk):
             win_x = user32.GetSystemMetrics(0) - 20
             win_y = user32.GetSystemMetrics(1) - 60
 
-            win_x = int(win_x / 1.5)   # TODO DELETE THIS LINE #########################################################
-            win_y = int(win_y / 1.5)   # TODO DELETE THIS LINE #########################################################
+            win_x = int(win_x / 1.5)  # TODO DELETE THIS LINE #########################################################
+            win_y = int(win_y / 1.5)  # TODO DELETE THIS LINE #########################################################
             self.geometry(str(win_x) + 'x' + str(win_y) + '+758+1')  # TODO change +758+1 to +2+2
 
             # self.display_game(None)
@@ -1031,9 +1356,10 @@ class Client(tk.Tk):
 
             self.game_STATE = 'PASSIV'
         return 'get_update'
-# endregion
 
-# region ------ MAINGAME -----------------------------------------------------------------------------------------------
+    # endregion
+
+    # region ------ MAINGAME -------------------------------------------------------------------------------------------
     def game_lose(self):
         # TODO lose game
         print("You lose.")
@@ -1099,9 +1425,34 @@ class Client(tk.Tk):
                     if append:
                         self.this_player_range.append(s)
             self.this_player_range.remove(aktpos)
-# endregion
 
-# region ###### DRAW ###################################################################################################
+    def receive_card(self, *args):
+        _print(args)
+        # get args from response
+        if len(args) > 0:
+            if 'new_cards' in args[0] and self.game_STATE == "SUPPLY":
+                self.this_player_drawcards = args[0]['new_cards']
+                self.txt_status = "Nachschubphase"
+
+            if 'new_epi' in args[0] and self.game_STATE == "SUPPLY":
+                old = self.this_player_drawcards
+                self.this_player_drawcards = [args[0]['new_epi'][0]]
+                for o in old:
+                    self.this_player_drawcards.append(o)
+                self.txt_status = "Epidemie"
+                print(">>> EPIDEMIE >>>", str(self.this_player_drawcards))
+
+            if 'new_inf' in args[0] and self.game_STATE == "INFECT":
+                self.this_player_drawcards = args[0]['new_inf']
+                self.txt_status = "Infektionsphase"
+
+            self.gameupdatelist['cards'].append(7)
+
+        return 'getVersion'
+
+    # endregion
+
+    # region ###### DRAW ###############################################################################################
 
     def game_update(self, args):
         # region info read data ########################################################################################
@@ -1145,6 +1496,9 @@ class Client(tk.Tk):
                 else:
                     self.gameupdatelist['cards'].append(c)
             self.this_player_cards = data[self.this_player_num + 48]
+
+        for p in range(0, 4):
+            self.all_player_cards[p] = data[p + 48]
 
         # marker
         akt_m = self.outbreak, self.inflvl, self.supplies
@@ -1213,7 +1567,7 @@ class Client(tk.Tk):
         if self.old_window_h != win_h or self.old_window_w != win_w:  # resize #########################################
             print("RESIZE WINDOW")
 
-            for child in self.winfo_children():     # destroy all
+            for child in self.winfo_children():  # destroy all
                 child.destroy()
 
             # set base frame over whole window
@@ -1329,7 +1683,6 @@ class Client(tk.Tk):
             self.old_window_w = win_w
             self.old_window_h = win_h
 
-            # TODO check final
             self.gameupdatelist = {'city': [], 'cards': [], 'marker1': 0, 'marker2': 0, 'playerpos': 0}
 
         else:  # only update, no resize
@@ -1360,6 +1713,7 @@ class Client(tk.Tk):
     def draw_cities(self, aw):
         def inf_value(e):
             return e['value']
+
         c = self.city[aw]
         self.game_canvas.delete("c" + str(c.get('ID')))
         card_h = self.section_card - 8
@@ -1400,6 +1754,41 @@ class Client(tk.Tk):
                                           tags=("c" + str(c.get('ID')), "center"))
         self.gameupdatelist['city'] = []
 
+    def draw_disease_selection(self, *cnum):
+        self.game_canvas.delete("disease_selection")
+        if len(cnum) > 0:  # draw selection
+            c = self.city[cnum[0]]
+            card_h = self.section_card - 8
+            size = int(self.section_game_w / 35)
+
+            # get anchor-position of city (center)
+            x = int(c.get('posX') * float(int(self.section_game_w)) / 100) + size / 2
+            y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + 15
+
+            pos = 0
+            for i in range(0, 4):
+                if c.get('i' + str(i)) > 0:
+                    param = dict(activeoutline="#ffffff", activewidth=2)
+                    switcher = {
+                        0: "#006bfd",
+                        1: "#fff300",
+                        2: "#189300",
+                        3: "#f10000",
+                    }
+                    param['fill'] = switcher.get(i)
+                    param['activefill'] = switcher.get(i)
+                    param['outline'] = switcher.get(i)
+
+                    diseasetag = "DIS_" + str(i)
+                    param['tags'] = "disease_selection", diseasetag
+
+                    self.game_canvas.create_oval(x + (size + 5) * pos, y - size / 2, x + (size + 5) * pos + size,
+                                                 y + size / 2,
+                                                 param)
+                    pos += 1
+                    self.game_canvas.tag_bind(diseasetag, "<ButtonRelease-1>",
+                                              lambda event, t=diseasetag: self.game_click(event, t))
+
     def draw_cards(self, card_num):
         self.game_canvas.delete("card" + str(card_num))
         card_w = int((self.section_game_w - 72) / 8)
@@ -1413,31 +1802,34 @@ class Client(tk.Tk):
             self.game_canvas.create_image(
                 8 + (8 + card_w) * card_num, 8, image=self.img_c1[card], anchor=NW, tags="card" + str(card_num))
 
-        # draw card pile TODO check
-        if len(self.this_player_drawcards) > 0:
-            self.img_c1[self.this_player_drawcards[0]] = ImageTk.PhotoImage(
-                self.img_c1_raw[self.this_player_drawcards[0]].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
+        # draw card pile
+        if len(self.this_player_drawcards) > 0:  # drawcard
+            if self.this_player_drawcards[0] not in self.this_player_cards:  # only resize if not in playercards
+                self.img_c1[self.this_player_drawcards[0]] = ImageTk.PhotoImage(
+                    self.img_c1_raw[self.this_player_drawcards[0]].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
             self.game_canvas.create_image(
                 8 + (8 + card_w) * 7, 8, image=self.img_c1[self.this_player_drawcards[0]], anchor=NW, tags="cards")
-            if self.game_STATE == "INFECT" or self.game_STATE == "EPIDEMIE":
+
+            # draw overlay (infect)
+            if self.game_STATE == "INFECT" or self.this_player_turns["turn"] >= 100:
                 self.img_c2 = ImageTk.PhotoImage(
                     self.img_c2_raw.resize((int(card_w), int(card_h)), Image.ANTIALIAS))
                 self.game_canvas.create_image(
                     8 + (8 + card_w) * 7, 8, image=self.img_c2, anchor=NW, tags="cards")
-
-        else:  # TODO check
+        # draw back
+        else:
             if self.game_STATE == "INFECT":
                 self.img_c2_back = ImageTk.PhotoImage(
                     self.img_c2_back_raw.resize((int(card_w), int(card_h)), Image.ANTIALIAS))
                 self.game_canvas.create_image(
                     8 + (8 + card_w) * 7, 8, image=self.img_c2_back, anchor=NW, tags="cards")
-
             else:
                 self.img_c1[54] = ImageTk.PhotoImage(
                     self.img_c1_raw[54].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
                 self.game_canvas.create_image(
                     8 + (8 + card_w) * 7, 8, image=self.img_c1[54], anchor=NW, tags="cards")
 
+        self.draw_card_highlight()
         self.gameupdatelist['cards'] = []
 
     def draw_bar(self):
@@ -1508,7 +1900,6 @@ class Client(tk.Tk):
             self.game_canvas.create_rectangle(am_rect(sup_x + sup_s, sup_y + sup_t, sup_w, sup_h),
                                               fill="#4eff00", outline='', tags="m1")
 
-
             inf_a = float(self.section_game_w) / 34 * 12, self.section_action + 8
             inf_size = float(self.section_game_w / 34) / 100 * 25, float(self.section_game_w / 34) / 100 * 25
             # infection
@@ -1570,14 +1961,14 @@ class Client(tk.Tk):
 
         if len(args) > 0:
             param = dict(fill="#000000", stipple=trans, activefill="", activestipple=trans, activewidth=3,
-                        tags="card_highlight_sel")
-            param['outline'] =  args[1]
-            param['activeoutline'] =  args[1]
-            for bg in range(0, 7):
-                if bg in args[0]:
-                    self.game_canvas.create_rectangle(
-                        am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), param)
-        else:  #default
+                         tags="card_highlight_sel")
+            param['outline'] = args[1]
+            param['activeoutline'] = args[1]
+            for bg in args[0]:
+                self.game_canvas.create_rectangle(
+                    am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), param)
+            self.game_canvas.tag_bind("card_highlight_sel", "<ButtonRelease-1>", self.game_click)
+        else:  # default
             self.game_canvas.delete("card_highlight_sel")
             if len(self.this_player_drawcards) > 0:
                 if self.this_player_drawcards[0] == self.card_epidemie or self.game_STATE == "INFECT":
@@ -1610,6 +2001,7 @@ class Client(tk.Tk):
 
                 self.game_canvas.tag_bind("card_highlight", "<Enter>", self.draw_tooltip)
                 self.game_canvas.tag_bind("card_highlight", "<Leave>", self.dismiss_tooltip)
+                self.game_canvas.tag_bind("card_highlight", "<ButtonRelease-1>", self.game_click)
 
     def draw_city_highlight(self, *args):
         self.game_canvas.delete("city_highlight")
@@ -1618,17 +2010,20 @@ class Client(tk.Tk):
                 if aw < 48:
                     c = self.city[aw]
                     card_h = self.section_card - 8
-                    s_inf = 320 * self.section_game_w / (3380 * 2)  # variable for marker size (half the size)
-                    s_cen = s_inf * 120 / 320
 
                     # get anchor-position of city (center)
                     x = int(c.get('posX') * float(int(self.section_game_w)) / 100)
                     y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
                     r = (self.section_game_w * 0.0125)
-                    self.game_canvas.create_oval(x - r, y - r, x + r, y + r,
-                                                 outline="#00ff00", fill="", activefill="#ff0000",
-                                                 tags="city_highlight")
-                    self.game_canvas.tag_bind("city_highlight", "<ButtonRelease-1>", self.game_click)
+
+                    citytag = "CITY" + str(aw)
+
+                    param = dict(outline="#00ff00", fill="", activefill="#ff0000")
+                    param['tags'] = "city_highlight", citytag
+                    self.game_canvas.create_oval(x - r, y - r, x + r, y + r, param)
+
+                    self.game_canvas.tag_bind(citytag, "<ButtonRelease-1>",
+                                              lambda event, t=citytag: self.game_click(event, t))
 
     def draw_tooltip(self, event):
 
@@ -1671,7 +2066,7 @@ class Client(tk.Tk):
                     if self.game_STATE == "INFECT":
                         text = "Infizieren"
                 else:
-                    text = "Epidemie"
+                    text = "Epidemie auslösen"
 
             self.game_canvas.itemconfigure(self.i_quicktip, fill="white", text=text)
             self.game_canvas.coords(self.i_quicktip, posx, self.section_card + 24)
@@ -1679,7 +2074,6 @@ class Client(tk.Tk):
     def dismiss_tooltip(self, *event):
         self.game_canvas.itemconfigure(self.i_quicktip, fill="")
     # endregion
-
 
 
 print("START")

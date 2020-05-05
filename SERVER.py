@@ -80,7 +80,7 @@ class Server(Thread):
         self.outbreak = 0
         self.inflvl = 0
         self.newinfection = [2, 2, 2, 3, 3, 4]
-        self.healing = [0, 1, 0, 2]         # 0 = active,  1 = healed,  2 = exterminated
+        self.healing = [0, 0, 0, 0]         # 0 = active,  1 = healed,  2 = exterminated
 
         # self.center = 5  # one in Atlanta + 5 => 6
 
@@ -123,61 +123,62 @@ class Server(Thread):
         # center':  bool    is a center in the city, default:0, Atlanta (ID: 3): 1
         # name':    str     eg. 'San Francisco'
         #
-        self.city = [{'ID':  0, 'farbe': 0, 'v1':  2, 'v2': 13, 'v3': 40, 'v4': 47, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5864, 'name': 'San Francisco'},
-                     {'ID':  1, 'farbe': 0, 'v1':  1, 'v2': 13, 'v3': 14, 'v4':  3, 'v5':  4, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9121, 'name': 'Chicago'},
-                     {'ID':  2, 'farbe': 0, 'v1':  2, 'v2':  6, 'v3': 15, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop':  4715, 'name': 'Atlanta'},
-                     {'ID':  3, 'farbe': 0, 'v1':  2, 'v2':  6, 'v3':  5, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3429, 'name': 'Montréal'},
-                     {'ID':  4, 'farbe': 0, 'v1':  4, 'v2':  6, 'v3':  7, 'v4':  8, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20464, 'name': 'New York'},
-                     {'ID':  5, 'farbe': 0, 'v1':  5, 'v2':  4, 'v3':  3, 'v4': 15, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4679, 'name': 'Washington'},
-                     {'ID':  6, 'farbe': 0, 'v1':  5, 'v2': 20, 'v3': 25, 'v4':  9, 'v5':  8, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5427, 'name': 'Madrid'},
-                     {'ID':  7, 'farbe': 0, 'v1':  5, 'v2':  7, 'v3':  9, 'v4': 10, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8586, 'name': 'London'},
-                     {'ID':  8, 'farbe': 0, 'v1':  8, 'v2':  7, 'v3': 25, 'v4': 11, 'v5': 10, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10755, 'name': 'Paris'},
-                     {'ID':  9, 'farbe': 0, 'v1':  8, 'v2':  9, 'v3': 11, 'v4': 12, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':   575, 'name': 'Essen'},
-                     {'ID': 10, 'farbe': 0, 'v1': 10, 'v2':  9, 'v3': 27, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5232, 'name': 'Mailand'},
-                     {'ID': 11, 'farbe': 0, 'v1': 10, 'v2': 27, 'v3': 28, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4879, 'name': 'St. Petersburg'},
-                     {'ID': 12, 'farbe': 1, 'v1': 48, 'v2': 14, 'v3':  2, 'v4':  1, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14900, 'name': 'Los Angeles'},
-                     {'ID': 13, 'farbe': 1, 'v1': 13, 'v2': 17, 'v3': 16, 'v4': 15, 'v5':  2, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 19463, 'name': 'Mexico Stadt'},
-                     {'ID': 14, 'farbe': 1, 'v1': 14, 'v2': 16, 'v3':  6, 'v4':  3, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5582, 'name': 'Miami'},
-                     {'ID': 15, 'farbe': 1, 'v1': 14, 'v2': 17, 'v3': 19, 'v4': 20, 'v5': 15, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8102, 'name': 'Bogotá'},
-                     {'ID': 16, 'farbe': 1, 'v1': 14, 'v2': 18, 'v3': 16, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10479, 'name': 'Lima'},
-                     {'ID': 17, 'farbe': 1, 'v1': 17, 'v2':  0, 'v3':  0, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6015, 'name': 'Santiago'},
-                     {'ID': 18, 'farbe': 1, 'v1': 16, 'v2': 20, 'v3':  0, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13639, 'name': 'Buenos Aires'},
-                     {'ID': 19, 'farbe': 1, 'v1': 16, 'v2': 19, 'v3': 21, 'v4':  7, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20186, 'name': 'Sao Paulo'},
-                     {'ID': 20, 'farbe': 1, 'v1': 20, 'v2': 22, 'v3': 24, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 11547, 'name': 'Lagos'},
-                     {'ID': 21, 'farbe': 1, 'v1': 21, 'v2': 23, 'v3': 24, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9046, 'name': 'Kinshasa'},
-                     {'ID': 22, 'farbe': 1, 'v1': 22, 'v2': 24, 'v3':  0, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3888, 'name': 'Johannisburg'},
-                     {'ID': 23, 'farbe': 1, 'v1': 21, 'v2': 22, 'v3': 23, 'v4': 26, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4887, 'name': 'Khartum'},
-                     {'ID': 24, 'farbe': 2, 'v1':  7, 'v2': 26, 'v3': 27, 'v4':  9, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2946, 'name': 'Algier'},
-                     {'ID': 25, 'farbe': 2, 'v1': 25, 'v2': 24, 'v3': 30, 'v4': 29, 'v5': 27, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14718, 'name': 'Kairo'},
-                     {'ID': 26, 'farbe': 2, 'v1': 25, 'v2': 26, 'v3': 29, 'v4': 28, 'v5': 12, 'v6': 11, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13576, 'name': 'Istanbul'},
-                     # TODO REMOVE CENTER FROM MOSKAU ##############################################################################################################################################
-                     {'ID': 27, 'farbe': 2, 'v1': 12, 'v2': 27, 'v3': 31, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop': 15512, 'name': 'Moskau'},
-                     {'ID': 28, 'farbe': 2, 'v1': 27, 'v2': 26, 'v3': 30, 'v4': 32, 'v5': 31, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6204, 'name': 'Bagdad'},
-                     {'ID': 29, 'farbe': 2, 'v1': 26, 'v2': 32, 'v3': 29, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5037, 'name': 'Riad'},
-                     {'ID': 30, 'farbe': 2, 'v1': 28, 'v2': 29, 'v3': 32, 'v4': 34, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7419, 'name': 'Teheran'},
-                     {'ID': 31, 'farbe': 2, 'v1': 29, 'v2': 30, 'v3': 33, 'v4': 34, 'v5': 31, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20711, 'name': 'Karatschi'},
-                     {'ID': 32, 'farbe': 2, 'v1': 32, 'v2': 35, 'v3': 34, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 16910, 'name': 'Mumbai'},
-                     {'ID': 33, 'farbe': 2, 'v1': 31, 'v2': 32, 'v3': 33, 'v4': 35, 'v5': 36, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22242, 'name': 'Delhi'},
-                     {'ID': 34, 'farbe': 2, 'v1': 33, 'v2': 45, 'v3': 41, 'v4': 36, 'v5': 34, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8865, 'name': 'Chennai'},
-                     {'ID': 35, 'farbe': 2, 'v1': 34, 'v2': 35, 'v3': 41, 'v4': 42, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14374, 'name': 'Kalkutta'},
-                     {'ID': 36, 'farbe': 3, 'v1': 38, 'v2': 39, 'v3':  0, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 17311, 'name': 'Peking'},
-                     {'ID': 37, 'farbe': 3, 'v1': 37, 'v2': 39, 'v3': 40, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22547, 'name': 'Seoul'},
-                     {'ID': 38, 'farbe': 3, 'v1': 37, 'v2': 42, 'v3': 43, 'v4': 40, 'v5': 38, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13482, 'name': 'Shanghai'},
-                     {'ID': 39, 'farbe': 3, 'v1': 38, 'v2': 39, 'v3': 44, 'v4':  1, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13189, 'name': 'Tokyo'},
-                     {'ID': 40, 'farbe': 3, 'v1': 35, 'v2': 45, 'v3': 46, 'v4': 42, 'v5': 36, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7151, 'name': 'Bangkok'},
-                     {'ID': 41, 'farbe': 3, 'v1': 36, 'v2': 41, 'v3': 46, 'v4': 47, 'v5': 43, 'v6': 39, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7106, 'name': 'Hong Kong'},
-                     {'ID': 42, 'farbe': 3, 'v1': 42, 'v2': 47, 'v3': 44, 'v4': 39, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8338, 'name': 'Taipeh'},
-                     {'ID': 43, 'farbe': 3, 'v1': 40, 'v2': 43, 'v3':  0, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2871, 'name': 'Osaka'},
-                     {'ID': 44, 'farbe': 3, 'v1': 35, 'v2': 48, 'v3': 46, 'v4': 41, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 26063, 'name': 'Jakarta'},
-                     {'ID': 45, 'farbe': 3, 'v1': 45, 'v2': 47, 'v3': 42, 'v4': 41, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8314, 'name': 'Ho-Chi-MinH-Stadt'},
-                     {'ID': 46, 'farbe': 3, 'v1': 46, 'v2': 48, 'v3':  1, 'v4': 43, 'v5': 42, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20767, 'name': 'Manila'},
-                     {'ID': 47, 'farbe': 3, 'v1': 47, 'v2': 45, 'v3': 13, 'v4':  0, 'v5':  0, 'v6':  0, 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3785, 'name': 'Sydney'}]
+        self.city = [{'ID':  0, 'farbe': 0, 'con': [1, 12, 39, 46],              'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5864, 'name': 'San Francisco'},
+                     {'ID':  1, 'farbe': 0, 'con': [0, 12, 13,  2,  3],          'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9121, 'name': 'Chicago'},
+                     {'ID':  2, 'farbe': 0, 'con': [1,  5, 14],                  'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop':  4715, 'name': 'Atlanta'},
+                     {'ID':  3, 'farbe': 0, 'con': [1,  5,  4],                  'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3429, 'name': 'Montréal'},
+                     {'ID':  4, 'farbe': 0, 'con': [3,  5,  6,  7],              'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20464, 'name': 'New York'},
+                     {'ID':  5, 'farbe': 0, 'con': [ 4,  3,  2, 14],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4679, 'name': 'Washington'},
+                     {'ID':  6, 'farbe': 0, 'con': [ 4, 19, 24,  8,  7],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5427, 'name': 'Madrid'},
+                     {'ID':  7, 'farbe': 0, 'con': [ 4,  6,  8,  9],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8586, 'name': 'London'},
+                     {'ID':  8, 'farbe': 0, 'con': [ 7,  6, 24, 10,  9],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10755, 'name': 'Paris'},
+                     {'ID':  9, 'farbe': 0, 'con': [ 7,  8, 10, 11],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':   575, 'name': 'Essen'},
+                     {'ID': 10, 'farbe': 0, 'con': [ 9,  8, 26],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5232, 'name': 'Mailand'},
+                     {'ID': 11, 'farbe': 0, 'con': [ 9, 26, 27],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4879, 'name': 'St. Petersburg'},
+                     {'ID': 12, 'farbe': 1, 'con': [47, 13,  1,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14900, 'name': 'Los Angeles'},
+                     {'ID': 13, 'farbe': 1, 'con': [12, 16, 15, 14,  1],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 19463, 'name': 'Mexico Stadt'},
+                     {'ID': 14, 'farbe': 1, 'con': [13, 15,  5,  2],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5582, 'name': 'Miami'},
+                     {'ID': 15, 'farbe': 1, 'con': [13, 16, 18, 19, 14],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8102, 'name': 'Bogotá'},
+                     {'ID': 16, 'farbe': 1, 'con': [13, 17, 15],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10479, 'name': 'Lima'},
+                     {'ID': 17, 'farbe': 1, 'con': [16],                         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6015, 'name': 'Santiago'},
+                     {'ID': 18, 'farbe': 1, 'con': [15, 19],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13639, 'name': 'Buenos Aires'},
+                     {'ID': 19, 'farbe': 1, 'con': [15, 18, 20,  6],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20186, 'name': 'Sao Paulo'},
+                     {'ID': 20, 'farbe': 1, 'con': [19, 21, 23],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 11547, 'name': 'Lagos'},
+                     {'ID': 21, 'farbe': 1, 'con': [20, 22, 23],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9046, 'name': 'Kinshasa'},
+                     {'ID': 22, 'farbe': 1, 'con': [21, 23],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3888, 'name': 'Johannisburg'},
+                     {'ID': 23, 'farbe': 1, 'con': [20, 21, 22, 25],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4887, 'name': 'Khartum'},
+                     {'ID': 24, 'farbe': 2, 'con': [ 6, 25, 26,  8],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2946, 'name': 'Algier'},
+                     {'ID': 25, 'farbe': 2, 'con': [24, 23, 29, 28, 26],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14718, 'name': 'Kairo'},
+                     {'ID': 26, 'farbe': 2, 'con': [24, 25, 28, 27, 11, 10],     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13576, 'name': 'Istanbul'},
+                     {'ID': 27, 'farbe': 2, 'con': [11, 26, 30],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop': 15512, 'name': 'Moskau'},
+                     # TODO REMOVE CENTER FR#############################################################################################
+                     {'ID': 28, 'farbe': 2, 'con': [26, 25, 29, 31, 30],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6204, 'name': 'Bagdad'},
+                     {'ID': 29, 'farbe': 2, 'con': [25, 31, 28],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5037, 'name': 'Riad'},
+                     {'ID': 30, 'farbe': 2, 'con': [27, 28, 31, 33],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7419, 'name': 'Teheran'},
+                     {'ID': 31, 'farbe': 2, 'con': [28, 29, 32, 33, 30],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20711, 'name': 'Karatschi'},
+                     {'ID': 32, 'farbe': 2, 'con': [31, 34, 33],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 16910, 'name': 'Mumbai'},
+                     {'ID': 33, 'farbe': 2, 'con': [30, 31, 32, 34, 35],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22242, 'name': 'Delhi'},
+                     {'ID': 34, 'farbe': 2, 'con': [32, 44, 40, 35, 33],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8865, 'name': 'Chennai'},
+                     {'ID': 35, 'farbe': 2, 'con': [33, 34, 40, 41],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14374, 'name': 'Kalkutta'},
+                     {'ID': 36, 'farbe': 3, 'con': [37, 38],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 17311, 'name': 'Peking'},
+                     {'ID': 37, 'farbe': 3, 'con': [36, 38, 39],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22547, 'name': 'Seoul'},
+                     {'ID': 38, 'farbe': 3, 'con': [36, 41, 42, 39, 37],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13482, 'name': 'Shanghai'},
+                     {'ID': 39, 'farbe': 3, 'con': [37, 38, 43,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13189, 'name': 'Tokyo'},
+                     {'ID': 40, 'farbe': 3, 'con': [34, 44, 45, 41, 35],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7151, 'name': 'Bangkok'},
+                     {'ID': 41, 'farbe': 3, 'con': [35, 40, 45, 46, 42, 38],     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7106, 'name': 'Hong Kong'},
+                     {'ID': 42, 'farbe': 3, 'con': [41, 46, 43, 38],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8338, 'name': 'Taipeh'},
+                     {'ID': 43, 'farbe': 3, 'con': [39, 42],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2871, 'name': 'Osaka'},
+                     {'ID': 44, 'farbe': 3, 'con': [34, 47, 45, 40],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 26063, 'name': 'Jakarta'},
+                     {'ID': 45, 'farbe': 3, 'con': [44, 46, 41, 40],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8314, 'name': 'Ho-Chi-MinH-Stadt'},
+                     {'ID': 46, 'farbe': 3, 'con': [45, 47,  0, 42, 41],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20767, 'name': 'Manila'},
+                     {'ID': 47, 'farbe': 3, 'con': [46, 44, 12],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3785, 'name': 'Sydney'}]
         # endregion
 
         self.start()
 
     # region functions #################################################################################################
     def data2send(self):
+        # TODO optional better structure
         ##########################################################
         data = []
         # [ 0..47] = cities -> 5 values
@@ -192,13 +193,6 @@ class Server(Thread):
             data.append(line)
 
         for p in range(0, 4):
-            # line = []
-            # for c in range(0, 7):
-            #     if len(self.player_cards[p]) > c:
-            #         line.append(self.player_cards[p][c])
-            #     else:
-            #         line.append(0)
-            # data.append(line)
             data.append(self.player_cards[p])
 
         line = [self.outbreak, self.inflvl, len(self.cardpile_player)]
@@ -245,8 +239,9 @@ class Server(Thread):
             "draw_playercard":  self.deal_player,       # Main Game
             "draw_infcard":     self.deal_infection,
             "draw_epidemiecard":self.deal_epidemie,
-
             "center":           self.modify_center,
+            "heal":             self.healdisease,
+
             "update_cards":     self.update_cards,
             "update_inf":       self.update_infection,
             "turn_over":        self.set_next_player,
@@ -318,7 +313,7 @@ class Server(Thread):
                    "v": self.serverversion,
                    "cur_player": self.current_player,
                    }
-        return content
+        return self.get_update()
 
     def player_is_rdy(self):
         p = self.request.get("value")
@@ -437,7 +432,6 @@ class Server(Thread):
             self.carddisposal_player.append(card)
             self.player_cards[movep['player']].remove(card)
 
-        # todo do stuff
         return self.get_update()
 
     def deal_player(self):
@@ -511,42 +505,87 @@ class Server(Thread):
 
         return self.get_version()
 
+    def healdisease(self):
+        self.serverversion += 1
+
+        value = self.request.get("value")
+        disease = self.city[value.get('cards')[0]].get('farbe')
+
+        self.healing[disease] = 1
+        for c in value.get('cards'):
+            self.player_cards[value.get('player')].remove(c)
+            self.carddisposal_player.append(c)
+
+        return self.get_version()
+
     def update_infection(self):
         self.serverversion += 1
         value = self.request.get("value")
 
-        card = value.get("card")
-        color = self.city[card]['farbe']
+        # ------ new infection --------------------------------------------------------------------------------------- #
+        if "card" in value:
+            card = value.get("card")
+            color = self.city[card]['farbe']
 
-        if self.healing[color] != 2:  # check if extinct
-            infected = []
-            inf = [card]
+            epidemie = 1 if 'epidemie' in value else 0
 
-            while len(inf) > 0:
-                if inf[0] not in infected:
-                    if self.city[inf[0]]['i' + str(color)] < 3:
-                        self.city[inf[0]]['i' + str(color)] += 1
-                        if self.infection[color] > 0:
-                            self.infection[color] -= 1
-                        else:
-                            # -> YOU LOSE -----------------------------------------------
-                            self.game_STATE = "LOSE_GAME"
+            print("UPDATE_INFECTION", str(value), str(epidemie))
+
+            # if epidemie shuffle infection cards
+            self.carddisposal_infection.append(card)
+            if epidemie:
+                # increase intensity
+                random.shuffle(self.carddisposal_infection)
+                for c in self.cardpile_infection:
+                    self.carddisposal_infection.append(c)
+                self.cardpile_infection = self.carddisposal_infection
+                self.carddisposal_infection = []
+
+            if self.healing[color] != 2:  # check if extinct
+                infected = []
+                inf = [card]
+                # when epidemie = 1 add 3 otherwise add 1
+                while len(inf) > 0:
+                    if inf[0] not in infected:
+                        if self.city[inf[0]]['i' + str(color)] < 3 - (2 * epidemie):
+                            self.city[inf[0]]['i' + str(color)] += (1 + 2 * epidemie)
+                            if self.infection[color] > 0 + (2 * epidemie):
+                                self.infection[color] -= (1 + 2 * epidemie)
+                            else:
+                                # -> YOU LOSE -----------------------------------------------
+                                self.game_STATE = "LOSE_GAME"
+                                print("LOSE_GAME infection")
+                        else:  # outbreak
+                            self.outbreak += 1
+                            if self.outbreak >= 8:
+                                # -> YOU LOSE -----------------------------------------------
+                                self.game_STATE = "LOSE_GAME"
+                                print("LOSE_GAME outbreak")
+                            for o in self.city[inf[0]].get("con"):
+                                if o not in infected and o not in inf:
+                                    inf.append(o)
+
+                        print(str(inf))
                         infected.append(inf[0])
-                    else:  # outbreak
-                        self.outbreak += 1
-                        if self.outbreak >= 8:
-                            # -> YOU LOSE -----------------------------------------------
-                            self.game_STATE = "LOSE_GAME"
+                        epidemie = 0  # use epidemie only in first round
+                    del inf[0]
+        # ------ remove infection ------------------------------------------------------------------------------------ #
+        else:
+            player = value.get('player')
+            disease = value.get('disease')
 
-                        for o in self.city[inf[0]].get("con"):
-                            inf.append(o)
-                del inf[0]
+            if self.city[self.player_pos[player]]['i' + str(disease)] > 0:
+                if self.player_role[player] == 6:  # sanitäter
+                    self.infection[disease] += self.city[self.player_pos[player]]['i' + str(disease)]
+                    self.city[self.player_pos[player]]['i' + str(disease)] = 0
+                else:  # other player
+                    self.infection[disease] += 1
+                    self.city[self.player_pos[player]]['i' + str(disease)] -= 1
 
-        self.carddisposal_infection.append(card)
+                if self.infection[disease] > 23:
+                    self.healing[disease] = 2  # extinct
 
         return self.get_update()
-
-
 
     def modify_center(self):
         self.serverversion += 1
@@ -558,7 +597,8 @@ class Server(Thread):
         self.city[update.get('center_new')]['center'] = 1
         if update.get('center_removed') is not None:
             self.city[update.get('center_removed')]['center'] = 0
-        self.player_cards[update.get('player')] = update.get('cards')
+        if self.player_role[update.get('player')] != 7:
+            self.player_cards[update.get('player')].remove(update.get('center_new'))
 
         return self.get_version()
     # endregion
