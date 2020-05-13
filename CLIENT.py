@@ -15,20 +15,18 @@ import inspect
 from Pandemie import libclient
 
 # TODO Aktionskarten
-#   48:
-#   49:
-#   50:
-#   51:
-#   52:
+#   48: Prognose
+#   49: Freiflug
+#   50: zähle Bevölkerung
+#   51: staatliche Subvention
+#   52: eine ruhige Nacht
+
 # TODO Player spezialfunktionen:
 #   3: action 1a: zusätzliche aktionskarte aus ablegestapel
 #      action 1b: spiele diese karte
-#   5: action 1: move any player to other player
-#      action 2: move other player like self
-#   6: passiv 1: remove healed infections
-#                remove while walking through
 
 # TODO pos status and actiontext is wrong when window higher than wide
+# TODO action 14 + 15 for player role 5: other player must agree movement
 
 
 ########################################################################################################################
@@ -249,6 +247,7 @@ class Client(tk.Tk):
         self.exchange = []
 
         self.logistician = 5
+        self.actioncard = False
 
         # request
         self.host = ''
@@ -451,6 +450,7 @@ class Client(tk.Tk):
         self.game_canvas = ResizingCanvas(self.game_frame, width=1, height=1, bg="#333", highlightthickness=0)
 
         self.i_quicktip = self.game_canvas.create_text(0, 0)
+        self.i_actiontip = self.game_canvas.create_text(0, 0)
         self.i_action = Label(self.game_canvas)
         self.i_status = Label(self.game_canvas)
         self.txt_action = ""
@@ -793,15 +793,17 @@ class Client(tk.Tk):
         if m_response.get("R"):
             switcher = {
                 # RESPONSE after request ------------------------------------------------
-                "init_update": self.game_init_update,
-                "player_set": self.game_init_player_set,
-                "recon": self.game_init_recon,
-                "update": self.game_update,
-                "new_cards": self.receive_card,
+                "init_update":  self.game_init_update,
+                "player_set":   self.game_init_player_set,
+                "recon":        self.game_init_recon,
+                "update":       self.game_update,
+                "new_cards":    self.receive_card,
+                "count":        self.action_count_population,
                 # GLOBAL RESPONSE - STATE-CHANGE ----------------------------------------
-                "GAME": self.game_init_execute_game,
-                "LOSE_GAME": self.game_lose,
-                "WIN_GAME": self.game_win,
+                "GAME":         self.game_init_execute_game,
+                "LOSE_GAME":    self.game_lose,
+                "WIN_GAME":     self.game_win,
+
             }
             func = switcher.get(m_response.get("R"), lambda r: None)  # returns new action for request
             newaction = func(m_response)  # execute
@@ -841,6 +843,47 @@ class Client(tk.Tk):
                 print("FAILURE: Game Engine - No response")
         # endregion
         # region MANAGE state ##########################################################################################
+
+        # region ###### actions for any state
+        # ---  7 - start actioncard ---------------------------------------------------------------------------------- #
+        if self.this_player_turns['turn'] == 7:
+            if self.this_player_turns['sender'] == "BTN":
+                self.this_player_card_selection = []
+                for c in self.this_player_cards:
+                    if c > 47:
+                        self.txt_action = "Wähle Aktionskarte aus."
+                        self.this_player_card_selection.append(self.this_player_cards.index(c))
+                        self.draw_card_highlight([self.this_player_cards.index(c)], "#00ff00", "actioncard")
+            if self.this_player_turns['sender'] == "CARD":
+                self.this_player_turns['sender'] = "BTN"  # set card as btn
+                self.this_player_turns['turn'] = self.this_player_cards[self.this_player_turns['card']]
+        # --- 48 - ACTIONCARD - Prognose ----------------------------------------------------------------------------- #
+        if self.this_player_turns['turn'] == 48:
+            if self.this_player_turns['sender'] == "BTN":  # initialize action
+                print("ACTION PROGNOSE")
+        # --- 49 - ACTIONCARD - Freiflug ----------------------------------------------------------------------------- #
+        if self.this_player_turns['turn'] == 49:
+            if self.this_player_turns['sender'] == "BTN":  # initialize action
+                print("ACTION FREIFLUG")
+        # --- 50 - ACTIONCARD - zähle Bevölkerung -------------------------------------------------------------------- #
+        if self.this_player_turns['turn'] == 50:
+            if self.this_player_turns['sender'] == "BTN":  # initialize action
+                self.draw_card_highlight(None)
+                self.this_player_card_selection = []
+                self.txt_action = "Lade Städte..."
+
+                self.value = {'v': self.localversion,
+                              'player': self.this_player_num}
+                self._update('get_inf_disposal')
+        # --- 51 - ACTIONCARD - staatliche Subvention ---------------------------------------------------------------- #
+        if self.this_player_turns['turn'] == 51:
+            if self.this_player_turns['sender'] == "BTN":  # initialize action
+                print("ACTION SUBVENTION")
+        # --- 52 - ACTIONCARD - ruhige Nacht ------------------------------------------------------------------------- #
+        if self.this_player_turns['turn'] == 52:
+            if self.this_player_turns['sender'] == "BTN":  # initialize action
+                print("ACTION RUHIGE NACHT")
+        # endregion
 
         if self.game_STATE == "PASSIV":  # awaits turn
             if self.current_player == self.this_player_num:  # init STATE: action
@@ -1186,8 +1229,8 @@ class Client(tk.Tk):
                                           'cards': remove_cards}
                             self.this_player_card_selection = []
                             self._update('heal')
-                # --- 10 - move -------------------------------------------------------------------------------------- #
-                if self.this_player_turns['turn'] == 10:
+                # --- 11 - move -------------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 11:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
                         self.get_player_path()
                         self.draw_city_highlight(self.this_player_range)
@@ -1201,12 +1244,13 @@ class Client(tk.Tk):
                         # update server
                         self.value = {'v': self.localversion,
                                       'player': self.this_player_num,
+                                      'path': self.get_player_path(self.this_player_turns['city']),
                                       'moveplayer': move_player,
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': []}
                         self._update('player_move')
-                # --- 11 - fly direct -------------------------------------------------------------------------------- #
-                if self.this_player_turns['turn'] == 11:
+                # --- 12 - fly direct -------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 12:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
                         self.draw_city_highlight(self.this_player_cards)
                         self.txt_action = "Direktflug: Wähle Ziel. (eine Karte wird benötigt)"
@@ -1223,8 +1267,8 @@ class Client(tk.Tk):
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': [self.this_player_turns['city']]}
                         self._update('player_move')
-                # --- 12 - fly charter ------------------------------------------------------------------------------- #
-                if self.this_player_turns['turn'] == 12:
+                # --- 13 - fly charter ------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 13:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
                         if self.logistician < 3:
                             pos = self.all_player_pos[self.logistician]
@@ -1252,8 +1296,8 @@ class Client(tk.Tk):
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': [self.all_player_pos[move_player]]}
                         self._update('player_move')
-                # --- 13 - fly special ------------------------------------------------------------------------------- #
-                if self.this_player_turns['turn'] == 13:
+                # --- 14 - fly special ------------------------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 14:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
                         if self.city[self.all_player_pos[self.this_player_num]]['c']:
                             self.txt_action = "Sonderflug: Wähle Zielstadt mit Forschungscenter."
@@ -1279,21 +1323,55 @@ class Client(tk.Tk):
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': []}
                         self._update('player_move')
-                # -- 14 - LOGISTIKER - select player ----------------------------------------------------------------- #
-                if self.this_player_turns['turn'] == 14:
+                # --- 15 - LOGISTIKER - select player ---------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 15:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
                         self.draw_city_highlight()
                         selected_player = []
                         for num, name in enumerate(self.all_player_name):
                             if name != '':
                                 selected_player.append(num)
-                        _print(selected_player)
                         self.draw_player_selection(selected_player, "LOG")
+                        self.txt_action = "Wähle zu bewegenden Spieler"
                     if self.this_player_turns['sender'] == "PLAY":  # get player
                         self.draw_player_selection()
                         self.logistician = self.this_player_turns['player']
                         self.txt_action = "Bewege " + self.all_player_name[self.logistician]
+                # --- 16 - LOGISTIKER - move player to player -------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 16:
+                    if self.this_player_turns['sender'] == "BTN":  # initialize action
+                        self.draw_city_highlight()
+                        selected_player = []
+                        for num, name in enumerate(self.all_player_name):
+                            if name != '':
+                                selected_player.append(num)
+                        self.draw_player_selection(selected_player, "LOG")
+                        self.txt_action = "Wähle zu bewegenden Spieler"
 
+                    if self.this_player_turns['sender'] == "PLAY":  # get player
+                        self.draw_player_selection()
+
+                        selected_city = []
+                        for num, name in enumerate(self.all_player_name):
+                            if name != '':
+                                selected_city.append(self.all_player_pos[num])
+                        selected_city.remove(self.all_player_pos[self.this_player_turns['player']])
+
+                        self.draw_city_highlight(selected_city)
+                        self.txt_action = "Spezialfähigkeit: Wähle Zielstadt"
+
+                    if self.this_player_turns['sender'] == "CITY":  # get city and execute
+                        self.draw_city_highlight()
+                        self.this_player_turns['turns_left'] -= 1
+                        self.txt_action = ""
+                        self.logistician = 5
+                        # update server
+                        self.value = {'v': self.localversion,
+                                      'player': self.this_player_num,
+                                      'moveplayer': self.this_player_turns['player'],
+                                      'moveto': self.this_player_turns['city'],
+                                      'usedcards': []}
+                        self._update('player_move')
                 # --- 32 - end turn ---------------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 32 and self.this_player_turns['sender'] == "BTN":
                     self.this_player_turns = {'sender': "", 'turn': 99, 'turns_left': 0}
@@ -1341,7 +1419,7 @@ class Client(tk.Tk):
 
                         del self.this_player_drawcards[0]
                         self.gameupdatelist['cards'].append(7)
-                        # self.receive_card()  # update drawcards
+
                         # update server
                         self.value = {'player': self.this_player_num,
                                       'add': playercard_add,
@@ -1435,6 +1513,7 @@ class Client(tk.Tk):
                 _print("clicked at Card: " + str(card_num))
                 self.this_player_turns['sender'] = "CARD"
                 self.this_player_turns['card'] = card_num
+
             # endregion
             # region ###### CLICK @ FIELD ##############################################################################
             elif self.section_field > event.y > self.section_card + 8:  # map -> find city
@@ -1461,7 +1540,13 @@ class Client(tk.Tk):
                 num = math.floor(float(posx) / self.section_game_w * 34)
                 _print("action-BTN", str(num), "clicked.")
 
-                if self.this_player_turns['turns_left'] > 0 and self.game_STATE == "ACTION":
+                # reset highlights and info TODO add more / check
+                self.draw_card_highlight(None)
+                self.draw_card_highlight()
+                self.draw_city_highlight()
+                self.txt_action = ""
+
+                if (self.this_player_turns['turns_left'] > 0 and self.game_STATE == "ACTION") or num == 7:
                     self.this_player_turns['turn'] = num
                     self.this_player_turns['sender'] = "BTN"
                 else:
@@ -1747,6 +1832,12 @@ class Client(tk.Tk):
         # remove highlight
         # self.draw_card_highlight(None)
 
+    def action_count_population(self, args):
+        selection = args['inf_disposal']
+        self.draw_city_highlight(selection, "#ff00ff")
+        self.txt_action = "Wähle zu entfernende Stadtkarte aus"
+        return 'getVersion'
+
     def report_error(self, error):
         _print(error)
         self.value = {'v': self.localversion,
@@ -1964,37 +2055,39 @@ class Client(tk.Tk):
             self.game_canvas.create_rectangle(am_rect(5 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(6 * btnx, btny, btns, btns), param)
 
-            self.game_canvas.create_rectangle(am_rect(10 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(11 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(12 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(13 * btnx, btny, btns, btns), param)
+            self.game_canvas.create_rectangle(am_rect(14 * btnx, btny, btns, btns), param)
 
             self.game_canvas.create_rectangle(am_rect(32 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(33 * btnx, btny, btns, btns), param)
 
-            # aoptional additional icons
+            # optional additional icons
             if self.all_player_role[self.this_player_num] == 3:  # Krisenmanager
-                self.game_canvas.create_image(7 * btnx, btny,
+                self.game_canvas.create_image(8 * btnx, btny,
                                               image=self.img_icon[4],
                                               anchor=NW,
                                               tags="icon_4")
-                self.game_canvas.create_rectangle(am_rect(7 * btnx, btny, btns, btns), param)
+                self.game_canvas.create_rectangle(am_rect(8 * btnx, btny, btns, btns), param)
 
             if self.all_player_role[self.this_player_num] == 5:  # Logistiker
-                self.game_canvas.create_image(14 * btnx, btny,
+                self.game_canvas.create_image(15 * btnx, btny,
                                               image=self.img_icon[3],
                                               anchor=NW,
                                               tags="icon_3")
-                self.game_canvas.create_rectangle(am_rect(14 * btnx, btny, btns, btns), param)
+                self.game_canvas.create_rectangle(am_rect(15 * btnx, btny, btns, btns), param)
 
-                self.game_canvas.create_image(15 * btnx, btny,
+                self.game_canvas.create_image(16 * btnx, btny,
                                               image=self.img_icon[2],
                                               anchor=NW,
                                               tags="icon_2")
-                self.game_canvas.create_rectangle(am_rect(15 * btnx, btny, btns, btns), param)
+                self.game_canvas.create_rectangle(am_rect(16 * btnx, btny, btns, btns), param)
 
             self.i_quicktip = self.game_canvas.create_text(0, 0, text="", fill="", anchor=S,
                                                            font=('Helvetica', 10), tags="info")
+            self.i_actiontip = self.game_canvas.create_text(0, 0, text="", fill="", anchor=NW,
+                                                           font=('Helvetica', 10), tags="actiontip")
 
             self.game_canvas.tag_bind("btn", "<ButtonRelease-1>", self.game_click)
             self.game_canvas.tag_bind("btn", "<Enter>", self.draw_tooltip)
@@ -2113,45 +2206,47 @@ class Client(tk.Tk):
     def draw_player_selection(self, *args):
         self.game_canvas.delete("player_selection")
         if len(args) > 0:  # draw selection
-            players = args[0]
-            c = self.city[self.all_player_pos[players[0]]]
-            card_h = self.section_card - 8
-            size = int(self.section_game_w / 35)
+            if len(args[0]) > 0:
+                players = args[0]
+                c = self.city[self.all_player_pos[players[0]]]
+                card_h = self.section_card - 8
+                size = int(self.section_game_w / 35)
 
-            if len(args) <= 1:  # if second argument -> draw for logistiker
-                # get anchor-position of city (center)
-                x = int(c.get('X') * float(int(self.section_game_w)) / 100) + size / 2
-                y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + 15
-            else:
-                x = int((float(self.section_game_w) / 34) * 14)
-                y = self.section_field - size - 8
+                if len(args) <= 1:  # if second argument -> draw for logistiker
+                    # get anchor-position of city (center)
+                    x = int(c.get('X') * float(int(self.section_game_w)) / 100) + size / 2
+                    y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + 15
+                else:
+                    x = int((float(self.section_game_w) / 34) * 15)
+                    y = self.section_field - size - 8
 
-            for pos, p in enumerate(players):
-                role = self.all_player_role[p]
-                param = dict(activeoutline="#ffffff", activewidth=2)
-                switcher = {
-                    1: "#d6d7df",
-                    2: "#245a49",
-                    3: "#52aedb",
-                    4: "#8f5735",
-                    5: "#cf63ae",
-                    6: "#ee7024",
-                    7: "#7ab851",
-                }
-                param['fill'] = switcher.get(role)
-                param['activefill'] = switcher.get(role)
-                param['outline'] = switcher.get(role)
+                for pos, p in enumerate(players):
+                    role = self.all_player_role[p]
+                    param = dict(activeoutline="#ffffff", activewidth=2)
+                    switcher = {
+                        1: "#d6d7df",
+                        2: "#245a49",
+                        3: "#52aedb",
+                        4: "#8f5735",
+                        5: "#cf63ae",
+                        6: "#ee7024",
+                        7: "#7ab851",
+                    }
+                    param['fill'] = switcher.get(role)
+                    param['activefill'] = switcher.get(role)
+                    param['outline'] = switcher.get(role)
 
-                playertag = "PLAY" + str(p)
-                param['tags'] = "player_selection", playertag
+                    playertag = "PLAY" + str(p)
+                    param['tags'] = "player_selection", playertag
 
-                self.game_canvas.create_oval(x + (size + 5) * pos, y, x + (size + 5) * pos + size, y + size, param)
+                    self.game_canvas.create_oval(x + (size + 5) * pos, y, x + (size + 5) * pos + size, y + size, param)
 
-                self.game_canvas.tag_bind(playertag, "<ButtonRelease-1>",
-                                          lambda event, t=playertag: self.game_click(event, t))
+                    self.game_canvas.tag_bind(playertag, "<ButtonRelease-1>",
+                                              lambda event, t=playertag: self.game_click(event, t))
 
     def draw_cards(self, card_num):
         self.game_canvas.delete("card" + str(card_num))
+
         card_w = int((self.section_game_w - 72) / 8)
         card_h = int((self.section_game_w - 72) / 8 / 7 * 10)
 
@@ -2162,6 +2257,33 @@ class Client(tk.Tk):
                 self.img_c1_raw[card].resize((int(card_w), int(card_h)), Image.ANTIALIAS))
             self.game_canvas.create_image(
                 8 + (8 + card_w) * card_num, 8, image=self.img_c1[card], anchor=NW, tags="card" + str(card_num))
+
+        # draw icon for actioncard
+            if self.this_player_cards[card_num] > 47 and not self.actioncard:
+                self.actioncard = True
+                btnx = (float(self.section_game_w) / 34)
+                btny = self.section_field + 8
+                btns = int((float(self.section_game_w) / 34))
+                self.game_canvas.create_image(7 * btnx, btny,
+                                              image=self.img_icon[5],
+                                              anchor=NW,
+                                              tags="icon_5")
+                self.game_canvas.create_rectangle(am_rect(7 * btnx, btny, btns, btns),
+                                                  fill="#000000",
+                                                  stipple=trans,
+                                                  outline="#000000",
+                                                  width=1,
+                                                  activeoutline="#00aa00",
+                                                  activewidth=3,
+                                                  tags=('btn', "icon_5"))
+        # delete action icon if no actioncard available
+            check = True
+            for c in self.this_player_cards:
+                if c > 47:
+                    check = False
+            if check:
+                self.game_canvas.delete("icon_5")
+                self.actioncard = False
 
         # draw card pile
         if len(self.this_player_drawcards) > 0:  # drawcard
@@ -2323,15 +2445,24 @@ class Client(tk.Tk):
         if len(args) > 0:
             if args[0] is None:
                 self.game_canvas.delete("card_highlight_sel")
+                self.game_canvas.delete("actioncard")
             else:
+                if len(args) > 1:  # actioncard
+                    tag = "actioncard"
+                else:
+                    tag = "card_highlight_sel"
+
                 param = dict(fill="#000000", stipple=trans, activefill="", activestipple=trans, activewidth=3,
-                             tags="card_highlight_sel")
+                             tags=tag)
                 param['outline'] = args[1]
                 param['activeoutline'] = args[1]
                 for bg in args[0]:
                     self.game_canvas.create_rectangle(
                         am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), param)
-                self.game_canvas.tag_bind("card_highlight_sel", "<ButtonRelease-1>", self.game_click)
+                self.game_canvas.tag_bind(tag, "<ButtonRelease-1>", self.game_click)
+                self.game_canvas.tag_bind("actioncard", "<Enter>", self.draw_tooltip_action)
+                self.game_canvas.tag_bind("actioncard", "<Leave>", self.dismiss_tooltip)
+
         else:  # default
             self.game_canvas.delete("card_highlight_sel")
             if len(self.this_player_drawcards) > 0:
@@ -2382,7 +2513,11 @@ class Client(tk.Tk):
 
                     citytag = "CITY" + str(aw)
 
-                    param = dict(outline="#00ff00", fill="", activefill="#ff0000")
+                    if len(args) > 1:  # action
+                        param = dict(outline=args[1], fill="", width=2, activewidth=2, activefill=args[1])
+                    else:
+                        param = dict(outline="#00ff00", fill="", activefill="#ff0000")
+
                     param['tags'] = "city_highlight", citytag
                     self.game_canvas.create_oval(x - r, y - r, x + r, y + r, param)
 
@@ -2400,13 +2535,14 @@ class Client(tk.Tk):
                 4: "Krankheit behandeln",
                 5: "Wissen teilen",
                 6: "Heilmittel entdecken",
-                7: "Krisenmanager",
-                10: "Autofahrt/Schifffahrt",
-                11: "Direktflug",
-                12: "Charterflug",
-                13: "Sonderflug",
-                14: "Bewege anderen Spieler",
-                15: "Aktion Logistiker",
+                7: "Aktionskarte spielen",
+                8: "Krisenmanager",
+                11: "Autofahrt/Schifffahrt",
+                12: "Direktflug",
+                13: "Charterflug",
+                14: "Sonderflug",
+                15: "Bewege anderen Spieler",
+                16: "Bewege Spieler zu Spieler",
                 32: "Zug beenden",
                 33: "reload"
             }
@@ -2433,11 +2569,56 @@ class Client(tk.Tk):
                 else:
                     text = "Epidemie auslösen"
 
-            self.game_canvas.itemconfigure(self.i_quicktip, fill="white", text=text)
+            self.game_canvas.itemconfigure(self.i_quicktip,
+                                           fill="white",
+                                           text=text,
+                                           anchor=S)
             self.game_canvas.coords(self.i_quicktip, posx, self.section_card + 24)
 
+    def draw_tooltip_action(self, event):
+
+        posx = self.game_canvas.coords(tk.CURRENT)[0] + 8
+        num = math.floor(float(posx) / self.section_game_w * 8)
+        card = self.this_player_cards[num]
+
+        switcher = {
+            48: "Prognose\n\n"
+                "Sieh die die obersten\n"
+                "6 Karten des Nachzieh-\n"
+                "stapels an und ordne\n"
+                "sie neu.\n",
+            49: "Freiflug\n\n"
+                "Bewege eine beliebige\n"
+                "Spielfigur in eine\n"
+                "beliebige Stadt.\n",
+            50: "Zähle Bevölkerung\n\n"
+                "Wähle eine Karte aus dem\n"
+                "Infektions-Ablagestapel\n"
+                "und entferne sie aus dem\n"
+                "Spiel.",
+            51: "Staatliche Subvention\n\n"
+                "Errichte ein Forschungs-\n"
+                "zentrum ohne Karte in\n"
+                "einer beliebigen Stadt.\n",
+            52: "Eine ruhige Nacht\n\n"
+                "Die nächste Infektions-\n"
+                "phase wird komplett\n"
+                "übersprungen.\n",
+        }
+
+        self.game_canvas.itemconfigure(self.i_actiontip,
+                                       fill="white",
+                                       text=switcher.get(card),
+                                       anchor=NW)
+        self.game_canvas.coords(self.i_actiontip, posx, self.section_card + 10)
+        self.game_canvas.tag_raise(self.i_actiontip)
+        r = self.game_canvas.create_rectangle(self.game_canvas.bbox(self.i_actiontip), stipple="gray50", fill="black", tags="abg")
+        self.game_canvas.tag_lower(r, self.i_actiontip)
+
     def dismiss_tooltip(self, *event):
+        self.game_canvas.delete("abg")
         self.game_canvas.itemconfigure(self.i_quicktip, fill="")
+        self.game_canvas.itemconfigure(self.i_actiontip, fill="")
     # endregion
 
 

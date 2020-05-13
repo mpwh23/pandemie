@@ -126,7 +126,7 @@ class Server(Thread):
             {'ID': 11, 'd': 0, 'con': [ 9, 26, 27],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4879, 'name': 'St. Petersburg'},
             {'ID': 12, 'd': 1, 'con': [47, 13,  1,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14900, 'name': 'Los Angeles'},
             {'ID': 13, 'd': 1, 'con': [12, 16, 15, 14,  1],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 19463, 'name': 'Mexico Stadt'},
-            {'ID': 14, 'd': 1, 'con': [13, 15,  5,  2],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop':  5582, 'name': 'Miami'},  # TODO remove center
+            {'ID': 14, 'd': 1, 'con': [13, 15,  5,  2],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5582, 'name': 'Miami'},
             {'ID': 15, 'd': 1, 'con': [13, 16, 18, 19, 14],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8102, 'name': 'Bogotá'},
             {'ID': 16, 'd': 1, 'con': [13, 17, 15],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10479, 'name': 'Lima'},
             {'ID': 17, 'd': 1, 'con': [16],                         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6015, 'name': 'Santiago'},
@@ -227,7 +227,8 @@ class Server(Thread):
             "update_cards":         self.update_cards,
             "update_inf":           self.update_infection,
             "turn_over":            self.set_next_player,
-            "error":                self.print_error
+            "error":                self.print_error,
+            "get_inf_disposal":     self.get_inf_disposal,
 
         }
         # Get the function from switcher dictionary
@@ -277,13 +278,7 @@ class Server(Thread):
         if n < len(self.player_name):
             self.player_name[n] = newname
 
-            # TODO REMOVE
-            if newname == "log":
-                self.player_role[n] = 5
-            else:
-                self.player_role[n] = 2
-            # TODO REMOVE
-            # self.player_role[n] = self.set_player_role()
+            self.player_role[n] = self.set_player_role()
 
         content = {"R":             "player_set",
                    "v":             self.server_version,
@@ -371,6 +366,9 @@ class Server(Thread):
                     if self.city[c].get('pop') > pop:
                         pop = self.city[c].get('pop')
                         self.current_player = p  # set start player
+
+        # TODO REMOVE
+        self.player_cards[0] = [48, 49, 50, 4, 52, 6, 51]
 
         print("Player cards:", self.player_cards)
         print("Start Player:", str(self.current_player))
@@ -467,7 +465,33 @@ class Server(Thread):
             self.player_cards[movep['player']].remove(card)
             self.version('cards')
 
+        if self.player_role[movep['moveplayer']] == 6:  # Sanitäter
+            for disease in range(0, 4):
+                if self.healing[disease] == 1:  # disease is healed
+
+                    check_city = [movep['moveto']]
+                    if "path" in movep:
+                        for c in movep['path']:
+                            if c not in check_city:
+                                check_city.append(c)
+                    for c in check_city:
+                        self.infection[disease] += self.city[c]['i' + str(disease)]
+                        self.city[c]['i' + str(disease)] = 0
+                    if self.infection[disease] > 23:
+                        self.healing[disease] = 2  # extinct
+
+                    self.version('city', 'stats')
+
+            pass  # check and remove inf
+
         return self.get_update()
+
+    def get_inf_disposal(self):
+        # no update
+        content = {"R": "count",
+                   "inf_disposal": self.carddisposal_infection
+                   }
+        return content
 
     def deal_cards_player(self):
         # val = self.request.get("value")
@@ -599,6 +623,12 @@ class Server(Thread):
 
             return False
 
+        def check_sani(pos, color):
+            if 6 in self.player_role:
+                if self.player_pos[self.player_role.index(6)] == pos and self.healing[color] == 1:
+                    return True
+            return False
+
         value = self.request.get("value")
 
         # ------ new infection --------------------------------------------------------------------------------------- #
@@ -620,7 +650,7 @@ class Server(Thread):
 
             if self.healing[color] != 2:  # check if extinct
 
-                if not check_specialist(card):
+                if not check_specialist(card) and not check_sani(card, color):
                     infected = []
                     inf = [card]
                     # when epidemie = 1 add 3 otherwise add 1
@@ -641,7 +671,10 @@ class Server(Thread):
                                     self.game_STATE = "LOSE_GAME"
                                     print("LOSE_GAME outbreak")
                                 for o in self.city[inf[0]].get("con"):
-                                    if o not in infected and o not in inf and not check_specialist(o):
+                                    if o not in infected \
+                                            and o not in inf \
+                                            and not check_specialist(o) \
+                                            and not check_sani(o, color):
                                         inf.append(o)
 
                             infected.append(inf[0])

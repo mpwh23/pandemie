@@ -83,7 +83,7 @@ AM_DEBUG_OUTPUT = True
 #    Quarantänespezialistin(2): Am eigenen Standort und allen anliegenden Städten werden keine neuen
 #                               Seuchenwürfel platziert. somit auch keine Ausbrüche
 #
-# Ereigniskarten: TODO
+# Ereigniskarten:
 # Nachschubphase: ##########################################################################################
 #    2 Spielkarten nachziehen:  Kartenlimit beachten
 #       ggf. Epidemie:          increase Infektionsquote
@@ -354,7 +354,7 @@ class Client(tk.Tk):
 
         # region window 01 connection connect
         self.title("Pandemie | Verbindung")
-        self.geometry("512x140+758+1")  # TODO delete +758+1
+        self.geometry("512x140+758+1")
 
         self.CONframe = Frame(self)
 
@@ -451,7 +451,6 @@ class Client(tk.Tk):
             self.after(1, self.window_00_load)
 
     def window_00_load_async(self):
-        # TODO adjust max value self.ctrl_res_load[1]
         _print("  start")
         # connection
         # try to get ip for server from php-script
@@ -557,8 +556,7 @@ class Client(tk.Tk):
         self.entry4.pack(side="left")
 
         self.btn_con.focus_set()
-        self.btn_con.bind('<Return>', self.window_02b_recon)    # TODO DELETE THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # self.btn_con.bind('<Return>', self.window_02a_game_prep)  # TODO UNCOMMENT THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!
+        self.btn_con.bind('<Return>', self.window_02b_recon)
 
     def window_02a_game_prep(self, *event):
         _print()
@@ -569,7 +567,7 @@ class Client(tk.Tk):
         self.CONframe.destroy()
 
         self.title("Spielvorbereitung")
-        self.geometry("700x600+758+1")  # TODO delete +758+1
+        self.geometry("700x600+758+1")
         self.PREPframe.grid()
         self.lbl1.grid(row=0, column=1, padx=5, pady=18, sticky=E)
         self.entry_n.grid(row=0, column=2, padx=5, pady=18, sticky=W + E)
@@ -599,7 +597,7 @@ class Client(tk.Tk):
 
         self.title("Reconnect")
 
-        self.entry_re.insert(0, "0")  # TODO DELETE THIS LINE ##########################################################
+        self.entry_re.insert(0, "0")
 
         self.recon_frame.pack(side=TOP, pady=(40, 0))
         self.recon_label.pack(side="left")
@@ -949,7 +947,7 @@ class Client(tk.Tk):
             self.localversion = 0
 
         def turn_101_draw_playercard(card):
-            # TODO calculation on server???
+
             add_playercard = []
             remove_playercard = []
             switch = []
@@ -991,7 +989,7 @@ class Client(tk.Tk):
                 self.value = {'card': inf_card}
                 self.action = 'update_inf'
 
-# todo
+
         def card_cure(c_num):
             if c_num in self.this_player_card_selection:
                 self.this_player_card_selection.remove(c_num)
@@ -1012,7 +1010,6 @@ class Client(tk.Tk):
                 self.this_player_turns['turn'] = 62
                 return "Heilmittel entdecken."
 
-            # TODO delete cardselection
 
         def btn_03_build_center():
             # init var
@@ -1050,7 +1047,7 @@ class Client(tk.Tk):
                 else:  # move existing center
                     self.draw_city_highlight(center)
                     self.txt_action = "Wähle Center zum verschieben"
-                    # todo forschungscenter max = 6
+
             else:
                 self.txt_action = "Stadtkarte benötigt"
 
@@ -1156,7 +1153,7 @@ class Client(tk.Tk):
                     # 17: btn_17_turn_execute,
                     32: btn_32_end_turn,
                     33: btn_33_game_reload
-                    # TODO aktionen
+
                 }
                 func = switcher.get(num, lambda sender: None)
 
@@ -1250,10 +1247,10 @@ class Client(tk.Tk):
             win_x = user32.GetSystemMetrics(0) - 20
             win_y = user32.GetSystemMetrics(1) - 60
 
-            win_x = int(win_x / 1.5)   # TODO DELETE THIS LINE #########################################################
-            win_y = int(win_y / 1.5)   # TODO DELETE THIS LINE #########################################################
+            win_x = int(win_x / 1.5)
+            win_y = int(win_y / 1.5)
 
-            self.geometry(str(win_x) + 'x' + str(win_y) + '+758+1')  # TODO change +758+1 to +2+2
+            self.geometry(str(win_x) + 'x' + str(win_y) + '+758+1')
 
             # self.display_game(None)
             self.lbl_empty.place(relx=0.5, rely=0.5, anchor=CENTER)
@@ -1631,15 +1628,15 @@ class Client(tk.Tk):
 
         return 'getVersion'
     def game_lose(self):
-        # TODO lose game
+
         print("You lose.")
-        # TODO end game
+
         return 'getVersion'
 
     def game_win(self):
-        # TODO win game
+
         print("WIN!")
-        # TODO end game
+
         return 'getVersion'
 
 # region ###### draw ###################################################################################################
