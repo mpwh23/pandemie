@@ -20,7 +20,6 @@ class Message:
 
     # AM
     def get_request(self):
-        # print("GET >>> ", repr(self.response))
         return self.request
 
     def set_response(self, args):
@@ -101,16 +100,6 @@ class Message:
         message = message_hdr + jsonheader_bytes + content_bytes
         return message
 
-    #def _create_response_json_content(self):
-        # print("something missing? _create_response_json_content")
-        # content = {"result": 0}  #self.actions(self.request.get("action"))
-        # response = {
-        #    "content_bytes": self._json_encode(content, "utf-8"),
-        #    "content_type": "text/json",
-        #    "content_encoding": "utf-8",
-        # }
-        # return response
-
     def process_events(self, mask):
         if mask & selectors.EVENT_READ:
             self.read()
@@ -132,10 +121,6 @@ class Message:
                 self.process_request()
 
     def write(self):
-        # if self.request:
-            # if not self.response_created:
-                # self.create_response()
-
         self._write()
 
     def close(self):
@@ -193,7 +178,8 @@ class Message:
             encoding = self.jsonheader["content-encoding"]
             self.request = self._json_decode(data, encoding)
             # print("received request", repr(self.request), "from", self.addr)
-            print("r <-", repr(self.request), "from", self.addr)
+            # print("r <-", repr(self.request), "from", self.addr)
+            print("r <-", repr(self.request))
         else:
             # Binary or unknown content-type
             self.request = data
@@ -204,14 +190,3 @@ class Message:
         # Set selector to listen for write events, we're done reading.
         self._set_selector_events_mask("w")
 
-    #def create_response(self):
-        #print("something missing? create_response")
-        # response = self._create_response_json_content()
-        # if self.jsonheader["content-type"] == "text/json":
-        # response = self._create_response_json_content()
-        # else:
-        # Binary or unknown content-type
-        # response = self._create_response_binary_content()
-        # message = self._create_message(**response)
-        # self.response_created = True
-        # self._send_buffer += message

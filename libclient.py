@@ -23,10 +23,10 @@ class Message:
         self.version = ''
 
     # AM
-    def getVersion(self):
-        content = self.response
-        self.version = content.get("v")
-        return self.version
+    # def getVersion(self):
+    #     content = self.response
+    #     self.version = content.get("v")
+    #     return self.version
 
     def get_response(self):
         # print("GET >>> ", repr(self.response))

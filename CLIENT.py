@@ -15,8 +15,22 @@ import inspect
 from Pandemie import libclient
 
 # TODO Aktionskarten
-# TODO Player spezialfunktionen
-# TODO wissen tauschen
+#   48:
+#   49:
+#   50:
+#   51:
+#   52:
+# TODO Player spezialfunktionen:
+#   3: action 1a: zusätzliche aktionskarte aus ablegestapel
+#      action 1b: spiele diese karte
+#   5: action 1: move any player to other player
+#      action 2: move other player like self
+#   6: passiv 1: remove healed infections
+#                remove while walking through
+
+# TODO pos status and actiontext is wrong when window higher than wide
+
+
 ########################################################################################################################
 update_intervall = 3000
 port = 9999
@@ -86,7 +100,8 @@ AM_DEBUG_OUTPUT = True
 #    Quarantänespezialistin(2): Am eigenen Standort und allen anliegenden Städten werden keine neuen
 #                               Seuchenwürfel platziert. somit auch keine Ausbrüche
 #
-# Ereigniskarten: TODO
+# Ereigniskarten:
+#
 # Nachschubphase: ##########################################################################################
 #    2 Spielkarten nachziehen:  Kartenlimit beachten
 #       ggf. Epidemie:          increase Infektionsquote
@@ -165,7 +180,7 @@ AM_DEBUG_OUTPUT = True
 # endregion
 
 
-# region custum functions
+# region custum functions and classes
 def _print(*args):
     if AM_DEBUG_OUTPUT:
         line = ""
@@ -208,8 +223,6 @@ class ResizingCanvas(Canvas):  # a subclass of Canvas for dealing with resizing 
 
 def am_rect(x, y, w, h):
     return x, y, x + w, y + h
-
-
 # endregion
 
 
@@ -220,31 +233,36 @@ class Client(tk.Tk):
 
         # region game variable #########################################################################################
         # player
-        self.all_player_name = ['-', '-', '-', '-']
+        self.all_player_name = ['', '', '', '']
         self.all_player_role = [0, 0, 0, 0]
         self.all_player_pos = [2, 2, 2, 2]  # start in Atlanta
         self.all_player_cards = [[], [], [], []]
 
         self.this_player_num = 0
-        self.this_player_name = ''
         self.this_player_cards = []
         self.this_player_card_selection = []
         self.this_player_drawcards = []
         self.this_player_range = []
 
         self.this_player_turns = {'sender': "", 'turn': 0, 'turns_left': 0}
+        self.this_player_exchange = {'status': "", 'sender': 0, 'card': 0, 'receiver': 0}
+        self.exchange = []
 
-        # connection TODO rename con#####
+        self.logistician = 5
+
+        # request
         self.host = ''
         self.action = 'get_init_update'
-        self.value = ''
-        self.ctrl_res_load = [0, 79, 0]  # [act load, total load, ready] TODO check final value
-        self.ip_am = '127.0.0.1'
-        self.ip_parts = self.ip_am.split(".")
+        self.value = {'v': 0}
 
         self.update_client = False
         self.running = False
         self.block_request = False
+
+        # connection / loading
+        self.ctrl_res_load = [0, 90, 0]  # [act load, total load, ready]
+        self.ip_am = '127.0.0.1'
+        self.ip_parts = self.ip_am.split(".")
 
         # gamestats
         self.game_STATE = "INIT"  # region ###### info ######
@@ -254,7 +272,6 @@ class Client(tk.Tk):
         # PASSIV
         # ACTION
         # SUPPLY
-        # EPIDEMIE (optional)
         # INFECT
         # LOSE_GAME
         # WIN_GAME
@@ -266,7 +283,6 @@ class Client(tk.Tk):
         self.supplies = 0  # playercard-pile
         self.infection = [24, 24, 24, 24]  # 0-24
         self.healing = [0, 0, 0, 0]  # 0 = active,  1 = healed,  2 = exterminated
-        # TODO healing icons twisted
         self.card_epidemie = 53
         self.gameupdatelist = {'city': [], 'cards': [], 'marker1': 0, 'marker2': 0, 'playerpos': 0}
 
@@ -277,103 +293,55 @@ class Client(tk.Tk):
         self.section_status = 0
         self.section_action = 0
 
-        self.city = [
-            {'ID': 0, 'posX': 5.2, 'posY': 24.4, 'farbe': 0, 'con': [1, 12, 39, 46], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'San Francisco'},
-            {'ID': 1, 'posX': 14.7, 'posY': 18.5, 'farbe': 0, 'con': [0, 12, 13, 2, 3], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Chicago'},
-            {'ID': 2, 'posX': 17.4, 'posY': 30.2, 'farbe': 0, 'con': [1, 5, 14], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 1, 'pincity': 0, 'name': 'Atlanta'},
-            {'ID': 3, 'posX': 22.1, 'posY': 18.0, 'farbe': 0, 'con': [1, 5, 4], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Montréal'},
-            {'ID': 4, 'posX': 27.8, 'posY': 19.9, 'farbe': 0, 'con': [3, 5, 6, 7], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'New York'},
-            {'ID': 5, 'posX': 25.3, 'posY': 29.4, 'farbe': 0, 'con': [4, 3, 2, 14], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Washington'},
-            {'ID': 6, 'posX': 40.6, 'posY': 25.9, 'farbe': 0, 'con': [4, 19, 24, 8, 7], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Madrid'},
-            {'ID': 7, 'posX': 41.6, 'posY': 10.3, 'farbe': 0, 'con': [4, 6, 8, 9], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'London'},
-            {'ID': 8, 'posX': 47.2, 'posY': 18.1, 'farbe': 0, 'con': [7, 6, 24, 10, 9], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Paris'},
-            {'ID': 9, 'posX': 49.1, 'posY': 7.2, 'farbe': 0, 'con': [7, 8, 10, 11], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Essen'},
-            {'ID': 10, 'posX': 52.2, 'posY': 15.1, 'farbe': 0, 'con': [9, 8, 26], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Mailand'},
-            {'ID': 11, 'posX': 57.3, 'posY': 4.3, 'farbe': 0, 'con': [9, 26, 27], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'St. Petersburg'},
-            {'ID': 12, 'posX': 6.8, 'posY': 40.1, 'farbe': 1, 'con': [47, 13, 1, 0], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Los Angeles'},
-            {'ID': 13, 'posX': 13.6, 'posY': 45.4, 'farbe': 1, 'con': [12, 16, 15, 14, 1], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Mexico Stadt'},
-            {'ID': 14, 'posX': 22.2, 'posY': 42.9, 'farbe': 1, 'con': [13, 15, 5, 2], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Miami'},
-            {'ID': 15, 'posX': 21.5, 'posY': 58.7, 'farbe': 1, 'con': [13, 16, 18, 19, 14], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bogotá'},
-            {'ID': 16, 'posX': 18.9, 'posY': 75.7, 'farbe': 1, 'con': [13, 17, 15], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Lima'},
-            {'ID': 17, 'posX': 19.9, 'posY': 93.5, 'farbe': 1, 'con': [16], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Santiago'},
-            {'ID': 18, 'posX': 27.7, 'posY': 90.3, 'farbe': 1, 'con': [15, 19], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Buenos Aires'},
-            {'ID': 19, 'posX': 32.0, 'posY': 78.2, 'farbe': 1, 'con': [15, 18, 20, 6], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Sao Paulo'},
-            {'ID': 20, 'posX': 46.5, 'posY': 55.8, 'farbe': 1, 'con': [19, 21, 23], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Lagos'},
-            {'ID': 21, 'posX': 51.0, 'posY': 66.3, 'farbe': 1, 'con': [20, 22, 23], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Kinshasa'},
-            {'ID': 22, 'posX': 55.4, 'posY': 82.6, 'farbe': 1, 'con': [21, 23], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Johannisburg'},
-            {'ID': 23, 'posX': 56.0, 'posY': 53.0, 'farbe': 1, 'con': [20, 21, 22, 25], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Khartum'},
-            {'ID': 24, 'posX': 48.7, 'posY': 34.6, 'farbe': 2, 'con': [6, 25, 26, 8], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Algier'},
-            {'ID': 25, 'posX': 54.4, 'posY': 37.5, 'farbe': 2, 'con': [24, 23, 29, 28, 26], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kairo'},
-            {'ID': 26, 'posX': 55.5, 'posY': 24.3, 'farbe': 2, 'con': [24, 25, 28, 27, 11, 10], 'i0': 0, 'i1': 0,
-             'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Istanbul'},
-            {'ID': 27, 'posX': 61.3, 'posY': 15.0, 'farbe': 2, 'con': [11, 26, 30], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Moskau'},
-            {'ID': 28, 'posX': 60.7, 'posY': 32.3, 'farbe': 2, 'con': [26, 25, 29, 31, 30], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bagdad'},
-            {'ID': 29, 'posX': 61.6, 'posY': 46.8, 'farbe': 2, 'con': [25, 31, 28], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Riad'},
-            {'ID': 30, 'posX': 66.3, 'posY': 22.5, 'farbe': 2, 'con': [27, 28, 31, 33], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Teheran'},
-            {'ID': 31, 'posX': 67.9, 'posY': 37.9, 'farbe': 2, 'con': [28, 29, 32, 33, 30], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Karatschi'},
-            {'ID': 32, 'posX': 68.5, 'posY': 49.3, 'farbe': 2, 'con': [31, 34, 33], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Mumbai'},
-            {'ID': 33, 'posX': 73.3, 'posY': 33.1, 'farbe': 2, 'con': [30, 31, 32, 34, 35], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Delhi'},
-            {'ID': 34, 'posX': 74.3, 'posY': 57.5, 'farbe': 2, 'con': [32, 44, 40, 35, 33], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Chennai'},
-            {'ID': 35, 'posX': 78.5, 'posY': 36.9, 'farbe': 2, 'con': [33, 34, 40, 41], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Kalkutta'},
-            {'ID': 36, 'posX': 82.6, 'posY': 18.6, 'farbe': 3, 'con': [37, 38], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Peking'},
-            {'ID': 37, 'posX': 89.3, 'posY': 18.0, 'farbe': 3, 'con': [36, 38, 39], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Seoul'},
-            {'ID': 38, 'posX': 83.2, 'posY': 29.9, 'farbe': 3, 'con': [36, 41, 42, 39, 37], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Shanghai'},
-            {'ID': 39, 'posX': 94.5, 'posY': 24.3, 'farbe': 3, 'con': [37, 38, 43, 0], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Tokyo'},
-            {'ID': 40, 'posX': 79.6, 'posY': 50.3, 'farbe': 3, 'con': [34, 44, 45, 41, 35], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Bangkok'},
-            {'ID': 41, 'posX': 83.9, 'posY': 43.1, 'farbe': 3, 'con': [35, 40, 45, 46, 42, 38], 'i0': 0, 'i1': 0,
-             'i2': 0, 'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Hong Kong'},
-            {'ID': 42, 'posX': 89.8, 'posY': 41.0, 'farbe': 3, 'con': [41, 46, 43, 38], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Taipeh'},
-            {'ID': 43, 'posX': 95.1, 'posY': 36.1, 'farbe': 3, 'con': [39, 42], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Osaka'},
-            {'ID': 44, 'posX': 79.5, 'posY': 71.1, 'farbe': 3, 'con': [34, 47, 45, 40], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Jakarta'},
-            {'ID': 45, 'posX': 84.2, 'posY': 61.4, 'farbe': 3, 'con': [44, 46, 41, 40], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Ho-Chi-MinH-Stadt'},
-            {'ID': 46, 'posX': 91.4, 'posY': 60.6, 'farbe': 3, 'con': [45, 47, 0, 42, 41], 'i0': 0, 'i1': 0, 'i2': 0,
-             'i3': 0, 'center': 0, 'pincity': 0, 'name': 'Manila'},
-            {'ID': 47, 'posX': 95.6, 'posY': 93.1, 'farbe': 3, 'con': [46, 44, 12], 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0,
-             'center': 0, 'pincity': 0, 'name': 'Sydney'}]
+        self.city = [  # d = disease, i = infection, c = center
+            {'ID':  0, 'X':  5.2, 'Y': 24.4, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [1, 12, 39, 46],          'name': 'San Francisco'},
+            {'ID':  1, 'X': 14.7, 'Y': 18.5, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [0, 12, 13, 2, 3],        'name': 'Chicago'},
+            {'ID':  2, 'X': 17.4, 'Y': 30.2, 'd': 0, 'i': [0, 0, 0, 0], 'c': 1, 'con': [1, 5, 14],               'name': 'Atlanta'},
+            {'ID':  3, 'X': 22.1, 'Y': 18.0, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [1, 5, 4],                'name': 'Montréal'},
+            {'ID':  4, 'X': 27.8, 'Y': 19.9, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [3, 5, 6, 7],             'name': 'New York'},
+            {'ID':  5, 'X': 25.3, 'Y': 29.4, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [4, 3, 2, 14],            'name': 'Washington'},
+            {'ID':  6, 'X': 40.6, 'Y': 25.9, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [4, 19, 24, 8, 7],        'name': 'Madrid'},
+            {'ID':  7, 'X': 41.6, 'Y': 10.3, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [4, 6, 8, 9],             'name': 'London'},
+            {'ID':  8, 'X': 47.2, 'Y': 18.1, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [7, 6, 24, 10, 9],        'name': 'Paris'},
+            {'ID':  9, 'X': 49.1, 'Y':  7.2, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [7, 8, 10, 11],           'name': 'Essen'},
+            {'ID': 10, 'X': 52.2, 'Y': 15.1, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [9, 8, 26],               'name': 'Mailand'},
+            {'ID': 11, 'X': 57.3, 'Y':  4.3, 'd': 0, 'i': [0, 0, 0, 0], 'c': 0, 'con': [9, 26, 27],              'name': 'St. Petersburg'},
+            {'ID': 12, 'X':  6.8, 'Y': 40.1, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [47, 13, 1, 0],           'name': 'Los Angeles'},
+            {'ID': 13, 'X': 13.6, 'Y': 45.4, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [12, 16, 15, 14, 1],      'name': 'Mexico Stadt'},
+            {'ID': 14, 'X': 22.2, 'Y': 42.9, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [13, 15, 5, 2],           'name': 'Miami'},
+            {'ID': 15, 'X': 21.5, 'Y': 58.7, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [13, 16, 18, 19, 14],     'name': 'Bogotá'},
+            {'ID': 16, 'X': 18.9, 'Y': 75.7, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [13, 17, 15],             'name': 'Lima'},
+            {'ID': 17, 'X': 19.9, 'Y': 93.5, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [16],                     'name': 'Santiago'},
+            {'ID': 18, 'X': 27.7, 'Y': 90.3, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [15, 19],                 'name': 'Buenos Aires'},
+            {'ID': 19, 'X': 32.0, 'Y': 78.2, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [15, 18, 20, 6],          'name': 'Sao Paulo'},
+            {'ID': 20, 'X': 46.5, 'Y': 55.8, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [19, 21, 23],             'name': 'Lagos'},
+            {'ID': 21, 'X': 51.0, 'Y': 66.3, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [20, 22, 23],             'name': 'Kinshasa'},
+            {'ID': 22, 'X': 55.4, 'Y': 82.6, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [21, 23],                 'name': 'Johannisburg'},
+            {'ID': 23, 'X': 56.0, 'Y': 53.0, 'd': 1, 'i': [0, 0, 0, 0], 'c': 0, 'con': [20, 21, 22, 25],         'name': 'Khartum'},
+            {'ID': 24, 'X': 48.7, 'Y': 34.6, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [6, 25, 26, 8],           'name': 'Algier'},
+            {'ID': 25, 'X': 54.4, 'Y': 37.5, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [24, 23, 29, 28, 26],     'name': 'Kairo'},
+            {'ID': 26, 'X': 55.5, 'Y': 24.3, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [24, 25, 28, 27, 11, 10], 'name': 'Istanbul'},
+            {'ID': 27, 'X': 61.3, 'Y': 15.0, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [11, 26, 30],             'name': 'Moskau'},
+            {'ID': 28, 'X': 60.7, 'Y': 32.3, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [26, 25, 29, 31, 30],     'name': 'Bagdad'},
+            {'ID': 29, 'X': 61.6, 'Y': 46.8, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [25, 31, 28],             'name': 'Riad'},
+            {'ID': 30, 'X': 66.3, 'Y': 22.5, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [27, 28, 31, 33],         'name': 'Teheran'},
+            {'ID': 31, 'X': 67.9, 'Y': 37.9, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [28, 29, 32, 33, 30],     'name': 'Karatschi'},
+            {'ID': 32, 'X': 68.5, 'Y': 49.3, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [31, 34, 33],             'name': 'Mumbai'},
+            {'ID': 33, 'X': 73.3, 'Y': 33.1, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [30, 31, 32, 34, 35],     'name': 'Delhi'},
+            {'ID': 34, 'X': 74.3, 'Y': 57.5, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [32, 44, 40, 35, 33],     'name': 'Chennai'},
+            {'ID': 35, 'X': 78.5, 'Y': 36.9, 'd': 2, 'i': [0, 0, 0, 0], 'c': 0, 'con': [33, 34, 40, 41],         'name': 'Kalkutta'},
+            {'ID': 36, 'X': 82.6, 'Y': 18.6, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [37, 38],                 'name': 'Peking'},
+            {'ID': 37, 'X': 89.3, 'Y': 18.0, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [36, 38, 39],             'name': 'Seoul'},
+            {'ID': 38, 'X': 83.2, 'Y': 29.9, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [36, 41, 42, 39, 37],     'name': 'Shanghai'},
+            {'ID': 39, 'X': 94.5, 'Y': 24.3, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [37, 38, 43, 0],          'name': 'Tokyo'},
+            {'ID': 40, 'X': 79.6, 'Y': 50.3, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [34, 44, 45, 41, 35],     'name': 'Bangkok'},
+            {'ID': 41, 'X': 83.9, 'Y': 43.1, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [35, 40, 45, 46, 42, 38], 'name': 'Hong Kong'},
+            {'ID': 42, 'X': 89.8, 'Y': 41.0, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [41, 46, 43, 38],         'name': 'Taipeh'},
+            {'ID': 43, 'X': 95.1, 'Y': 36.1, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [39, 42],                 'name': 'Osaka'},
+            {'ID': 44, 'X': 79.5, 'Y': 71.1, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [34, 47, 45, 40],         'name': 'Jakarta'},
+            {'ID': 45, 'X': 84.2, 'Y': 61.4, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [44, 46, 41, 40],         'name': 'Ho-Chi-MinH-Stadt'},
+            {'ID': 46, 'X': 91.4, 'Y': 60.6, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [45, 47, 0, 42, 41],      'name': 'Manila'},
+            {'ID': 47, 'X': 95.6, 'Y': 93.1, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'con': [46, 44, 12],             'name': 'Sydney'}]
 
         # endregion
 
@@ -390,7 +358,12 @@ class Client(tk.Tk):
         self.img_status = ImageTk
         self.img_action_raw = Image  # actionbar
         self.img_action = ImageTk
-        self.img_char = []  # character cards
+
+        self.img_icon_raw = []  # additional icons
+        self.img_icon = []
+
+        self.img_char_raw = []  # character cards
+        self.img_char = []
         self.img_c1_raw = []  # player cards [00..53]
         self.img_c1 = []
         self.img_c2_back_raw = Image  # infectioncard, back
@@ -399,12 +372,14 @@ class Client(tk.Tk):
         self.img_c2 = ImageTk
         self.img_inf_raw = []  # infection marker: inf_0_1.png
         self.img_inf = []
-        self.img_heal_raw = []  # marker healing: 0 = healed 1 = extinct
-        self.img_heal = []
         self.img_center_raw = Image  # center
         self.img_center = ImageTk
         self.img_p_raw = []  # player_piece
         self.img_p = []
+        self.img_win_raw = Image
+        self.img_win = ImageTk
+        self.img_lose_raw = Image
+        self.img_lose = ImageTk
 
         # region window 00 connection load
         self.LOADframe = Frame(self)
@@ -415,7 +390,11 @@ class Client(tk.Tk):
 
         # region window 01 connection connect
         self.title("Pandemie | Verbindung")
-        self.geometry("512x140+758+1")  # TODO delete +758+1
+
+        if AM_DEBUG_OUTPUT:
+            self.geometry("512x140+758+1")
+        else:
+            self.geometry("512x140")
 
         self.CONframe = Frame(self)
 
@@ -482,7 +461,7 @@ class Client(tk.Tk):
 
         # endregion
 
-    # region ###### UI #####################################################################################################
+    # region ###### UI #################################################################################################
     def window_00_load(self):
 
         if self.ctrl_res_load[0] == 0:  # INIT
@@ -512,8 +491,9 @@ class Client(tk.Tk):
             self.after(1, self.window_00_load)
 
     def window_00_load_async(self):
-        # TODO adjust max value self.ctrl_res_load[1]
+
         _print("  start")
+        self.config(cursor="wait")
         # connection
         # try to get ip for server from php-script
         self.ip_am = urllib.request.urlopen(php_path).read().decode('utf8').strip()
@@ -521,9 +501,9 @@ class Client(tk.Tk):
 
         self.ctrl_res_load[2] = 1
 
-        #                     [0] increment
-        self.ctrl_res_load[1] = 80  # [1] total number of elements to load
-        #                     [2] boolean to 1 when ready
+        #                             [0] increment
+        self.ctrl_res_load[1] = 90  # [1] total number of elements to load
+        #                             [2] boolean to 1 when ready
 
         self.img_map_raw = Image.open(res_path + "mat/world.png")
         self.img_map = ImageTk.PhotoImage(self.img_map_raw)
@@ -559,9 +539,17 @@ class Client(tk.Tk):
         self.img_c2 = ImageTk.PhotoImage(self.img_c2_raw)
         self.ctrl_res_load[0] += 1
 
+        self.img_win_raw = Image.open(res_path + "mat/win.png")
+        self.img_win = ImageTk.PhotoImage(self.img_win_raw)
+        self.ctrl_res_load[0] += 1
+
+        self.img_lose_raw = Image.open(res_path + "mat/lose.png")
+        self.img_lose = ImageTk.PhotoImage(self.img_lose_raw)
+        self.ctrl_res_load[0] += 1
+
         for c in range(0, 8):
-            self.img_char.append(ImageTk.PhotoImage(
-                Image.open(res_path + "cards/char_" + str(c) + ".png").resize((350, 500), Image.ANTIALIAS)))
+            self.img_char_raw.append(Image.open(res_path + "cards/char_" + str(c) + ".png"))
+            self.img_char.append(ImageTk.PhotoImage(self.img_char_raw[c].resize((350, 500), Image.ANTIALIAS)))
             self.ctrl_res_load[0] += 1
 
         self.role_image = Label(self.PREPframe, image=self.img_char[0])
@@ -583,13 +571,12 @@ class Client(tk.Tk):
             self.img_p.append(ImageTk.PhotoImage(self.img_p_raw[p]))
             self.ctrl_res_load[0] += 1
 
-        self.img_heal_raw.append(Image.open(res_path + "mat/pan_healed.png"))
-        self.img_heal.append(ImageTk.PhotoImage(self.img_heal_raw[0]))
-        self.ctrl_res_load[0] += 1
-        self.img_heal_raw.append(Image.open(res_path + "mat/pan_ext.png"))
-        self.img_heal.append(ImageTk.PhotoImage(self.img_heal_raw[1]))
-        self.ctrl_res_load[0] += 1
+        for ico in range(0, 6):
+            self.img_icon_raw.append(Image.open(res_path + "mat/icon_" + str(ico) + ".png"))
+            self.img_icon.append(ImageTk.PhotoImage(self.img_icon_raw[ico]))
+            self.ctrl_res_load[0] += 1
 
+        self.config(cursor="")
         # loading done
         _print("  done ")
         self.ctrl_res_load[2] = 3
@@ -618,8 +605,10 @@ class Client(tk.Tk):
         self.entry4.pack(side="left")
 
         self.btn_con.focus_set()
-        self.btn_con.bind('<Return>', self.window_02b_recon)  # TODO DELETE THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # self.btn_con.bind('<Return>', self.window_02a_game_prep)  # TODO UNCOMMENT THIS LINE !!!!!!!!!!!!!!!!!!!!!!!!!
+        if AM_DEBUG_OUTPUT:
+            self.btn_con.bind('<Return>', self.window_02b_recon)
+        else:
+            self.btn_con.bind('<Return>', self.window_02a_game_prep)
 
     def window_02a_game_prep(self, *event):
         _print()
@@ -630,7 +619,12 @@ class Client(tk.Tk):
         self.CONframe.destroy()
 
         self.title("Spielvorbereitung")
-        self.geometry("700x600+758+1")  # TODO delete +758+1
+
+        if AM_DEBUG_OUTPUT:
+            self.geometry("700x600+758+1")
+        else:
+            self.geometry("700x600")
+
         self.PREPframe.grid()
         self.lbl1.grid(row=0, column=1, padx=5, pady=18, sticky=E)
         self.entry_n.grid(row=0, column=2, padx=5, pady=18, sticky=W + E)
@@ -660,7 +654,8 @@ class Client(tk.Tk):
 
         self.title("Reconnect")
 
-        self.entry_re.insert(0, "0")  # TODO DELETE THIS LINE ##########################################################
+        if AM_DEBUG_OUTPUT:
+            self.entry_re.insert(0, "0")
 
         self.recon_frame.pack(side=TOP, pady=(40, 0))
         self.recon_label.pack(side="left")
@@ -678,15 +673,14 @@ class Client(tk.Tk):
             self.entry_n.configure(state=DISABLED)
             self.btn_participate.configure(state=DISABLED)
             self.action = "player_signin"
-            self.this_player_name = playername.strip()
-            self.value = playername.strip()
+            self.value = {'v': self.localversion, 'player_name': playername.strip()}
 
     def btn_init_player_rdy(self):
         _print("BTN")
         self.btn_start.configure(bg="SeaGreen1", text="Warte auf andere Spieler", state=DISABLED)
         self.game_STATE = "WAIT"
         self.action = 'player_rdy'
-        self.value = self.this_player_num
+        self.value = {'v': self.localversion, 'player_num': self.this_player_num}
 
     def btn_init_recon(self, event=None):
         _print("BTN")
@@ -697,7 +691,7 @@ class Client(tk.Tk):
                 self.this_player_num = num
 
                 self.action = 'recon'
-                self.value = num
+                # self.value = {'v': self.localversion, 'num': num}
                 self.recon_frame.destroy()
                 self.start_main()
 
@@ -711,7 +705,6 @@ class Client(tk.Tk):
         self.send_request()
         self.running = True
         threading.Thread(target=self.delay_request).start()
-
     # endregion
 
     # region ###### connection #########################################################################################
@@ -729,7 +722,12 @@ class Client(tk.Tk):
             self.action = args[0]
         self.update_client = True
         self.block_request = True
-        self.config(cursor="watch")
+        if self.game_STATE == "LOSE_GAME":
+            self.config(cursor="pirate")
+        elif self.game_STATE == "WIN_GAME":
+            self.config(cursor="heart")
+        else:
+            self.config(cursor="watch")
 
     def delay_request(self):
         u = update_intervall  # default 3000
@@ -765,24 +763,26 @@ class Client(tk.Tk):
                         message.process_events(mask)
                         if mask == 1:
                             self.game_engine(message.get_response())
-                    except Exception:
+                    except Exception as e:
                         print(
                             "main: error: exception for",
                             f"{message.addr}:\n{traceback.format_exc()}",
+                            e
                         )
+                        self.report_error("Player " + str(self.this_player_num) + " Request Error:")
                         message.close()
                 # Check for a socket being monitored to continue.
                 if not self.sel.get_map():
                     break
         except KeyboardInterrupt:
             print("caught keyboard interrupt, exiting")
-
     # endregion
 
-    # region ###### game ###################################################################################################
+    # region ###### game ###############################################################################################
     def game_engine(self, m_response):
+
         m_version = m_response.get("v") if "v" in m_response else None
-        _print(str(m_response), self.game_STATE)
+        _print(str(m_response), self.game_STATE, m_response.get("state"))
 
         # update game button
         if self.this_player_turns['turn'] == 33 and self.this_player_turns['sender'] == "BTN":
@@ -790,7 +790,7 @@ class Client(tk.Tk):
             self.localversion = 0
 
         # region MANAGE requests #######################################################################################
-        if m_response.get("response"):
+        if m_response.get("R"):
             switcher = {
                 # RESPONSE after request ------------------------------------------------
                 "init_update": self.game_init_update,
@@ -803,7 +803,7 @@ class Client(tk.Tk):
                 "LOSE_GAME": self.game_lose,
                 "WIN_GAME": self.game_win,
             }
-            func = switcher.get(m_response.get("response"), lambda r: None)  # returns new action for request
+            func = switcher.get(m_response.get("R"), lambda r: None)  # returns new action for request
             newaction = func(m_response)  # execute
 
             func = switcher.get(m_response.get("state"), lambda: None)
@@ -820,11 +820,12 @@ class Client(tk.Tk):
         # region MANAGE version ########################################################################################
         else:
             if m_version is not None:
+
                 if m_version != self.localversion:
-                    self.value = self.this_player_num
                     if self.game_STATE == 'INIT' or self.game_STATE == 'WAIT':
                         self._update('get_init_update')
                     elif self.game_STATE in {'PASSIV', 'ACTION', 'SUPPLY', 'EPIDEMIE', 'INFECT'}:
+                        self.value = {'v': self.localversion}
                         self._update('get_update')
                     else:
                         print("FAILURE: unknown game status")
@@ -834,8 +835,8 @@ class Client(tk.Tk):
                     # unblock
                     self.block_request = False
                     self.config(cursor="")
+                    self.value = {'v': self.localversion}
                     self.action = 'getVersion'
-                    self.value = self.this_player_num
             else:
                 print("FAILURE: Game Engine - No response")
         # endregion
@@ -849,6 +850,26 @@ class Client(tk.Tk):
                 self.game_STATE = "ACTION"
             else:
                 self.txt_status = self.all_player_name[self.current_player] + " ist am Zug."
+            # ------ exchange card ----------------------------------------------------------------------------------- #
+            if len(self.this_player_drawcards) > 0 and self.this_player_turns['sender'] == "CARD":
+
+                playercard_decline = []
+                playercard_burn = []
+
+                if self.this_player_turns['card'] < len(self.this_player_cards):  # replace card
+                    playercard_burn.append(self.this_player_cards[self.this_player_turns['card']])
+                elif self.this_player_turns['card'] == 7:  # decline card
+                    playercard_decline.append(self.this_player_drawcards[0])
+
+                del self.this_player_drawcards[0]
+                self.gameupdatelist['cards'].append(7)
+
+                self.value = {'v': self.localversion,
+                              'status':     "response",
+                              'exchange':   self.this_player_exchange,
+                              'decline':    playercard_decline,
+                              'burn':       playercard_burn}
+                self._update('card_exchange')
 
         if self.game_STATE == "ACTION":
             # awaits click to set action, execute action, STATE ends when turns_left = 0
@@ -868,18 +889,20 @@ class Client(tk.Tk):
                         pos = self.all_player_pos[self.this_player_num]
                         center = []
                         for anz, c in enumerate(self.city):
-                            if c.get("center"):
+                            if c.get("c"):
                                 center.append(anz)
 
                         if pos in self.this_player_cards or \
                                 self.all_player_role[self.this_player_num] == 7:  # betriebsexperte
 
-                            if self.city[pos]['center'] != 1:
+                            if self.city[pos]['c'] != 1:
                                 if len(center) < 6:  # build new center
                                     # update game
                                     self.this_player_turns['turns_left'] -= 1
                                     # update server
-                                    self.value = {'player': self.this_player_num,
+
+                                    self.value = {'v': self.localversion,
+                                                  'player': self.this_player_num,
                                                   'center_new': pos,
                                                   'center_removed': None,
                                                   'cards': self.this_player_cards}
@@ -892,7 +915,8 @@ class Client(tk.Tk):
                                         # update game
                                         self.this_player_turns['turns_left'] -= 1
                                         # update server
-                                        self.value = {'player': self.this_player_num,
+                                        self.value = {'v': self.localversion,
+                                                      'player': self.this_player_num,
                                                       'center_new': pos,
                                                       'center_removed': self.this_player_turns['city'],
                                                       'cards': self.this_player_cards}
@@ -905,8 +929,9 @@ class Client(tk.Tk):
                 if self.this_player_turns['turn'] == 4:
                     if self.this_player_turns['sender'] == "BTN":
                         check = 0
+                        dis = None
                         for c in range(0, 4):
-                            if self.city[self.all_player_pos[self.this_player_num]]['i' + str(c)] > 0:
+                            if self.city[self.all_player_pos[self.this_player_num]]['i'][c] > 0:
                                 check += 1
                                 dis = c
                         if check == 0:
@@ -916,7 +941,8 @@ class Client(tk.Tk):
                             # update game
                             self.this_player_turns['turns_left'] -= 1
                             # update server
-                            self.value = {'player': self.this_player_num,
+                            self.value = {'v': self.localversion,
+                                          'player': self.this_player_num,
                                           'disease': dis}
                             self._update('update_inf')
                         else:
@@ -927,64 +953,197 @@ class Client(tk.Tk):
                         self.draw_disease_selection()
                         self.this_player_turns['turns_left'] -= 1
                         # update server
-                        self.value = {'player': self.this_player_num,
+                        self.value = {'v': self.localversion,
+                                      'player': self.this_player_num,
                                       'disease': self.this_player_turns['disease']}
                         self._update('update_inf')
                 # ---  5 - share knowledge --------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 5:
+                    # region ###### info ######
+                    # A player has citycard
+                    # B other player in same city has citycard
+                    # C player is role 4
+                    # D other player in same city is role 4
+                    #
+                    # A, C, AC  ->  send only
+                    # B, D, BD	->  get only
+                    # AD, BC    ->	send + get
+                    # endregion
+
+                    def execute_change():
+                        if self.check_exchange(self.this_player_exchange['sender'],
+                                               self.this_player_exchange['receiver'],
+                                               self.this_player_exchange['card']):
+                            self.txt_action = "Warte auf Bestätigung"
+                            self.this_player_exchange['status'] = "request"
+
+                            self.value = {'v':      self.localversion}
+                            for item in self.this_player_exchange:
+                                self.value[item] = self.this_player_exchange[item]
+                            self._update('card_exchange')
+                        else:
+                            self.txt_action = "ERROR exchange"
+                            print("ERROR exchange")
+                            self.report_error("Player " + str(self.this_player_num) + " ERROR exchange")
+
+                        # update game
+                        self.this_player_card_selection = []
+                        self.draw_card_highlight(None)
+                        self.draw_player_selection()
+
                     if self.this_player_turns['sender'] == "BTN":
-                        player = []
+
+                        self.this_player_card_selection = []
+                        self.exchange = []  # reset exchange state
+                        self.this_player_exchange = {'status': "", 'sender': None, 'receiver': None, 'card': None}
+
+                        player = []  # get all players in city of current player
                         for num, p in enumerate(self.all_player_pos):
                             if p == self.all_player_pos[self.this_player_num]:
                                 player.append(num)
 
                         if len(player) > 1:
-                            send_c = []
+                            # region build exchange option
+                            for p in player:
+                                if self.all_player_role[p] == 4:  # forscherin
+                                    if self.this_player_num == p:
+                                        self.exchange.append("C")
+                                    else:
+                                        self.exchange.append("D")
+                                if self.all_player_pos[self.this_player_num] in self.all_player_cards[p]:
+                                    if self.this_player_num == p:
+                                        self.exchange.append("A")
+                                    else:
+                                        self.exchange.append("B")
+                            # highlight option
+                            send_c = []  # collect all cards that possible can be send
                             if self.all_player_role[self.this_player_num] == 4:  # forscherin
-                                for c in self.this_player_cards:
+                                for num, c in enumerate(self.this_player_cards):
                                     if c < 48:
-                                        send_c.append(c)
-                            elif self.all_player_pos[self.this_player_num] in self.this_player_cards:
-                                send_c.append(self.all_player_pos[self.this_player_num])
+                                        send_c.append(num)
+                                        if "C" not in self.exchange:
+                                            self.exchange.append("C")
 
-                            get_c = []
+                            for num, c in enumerate(self.this_player_cards):
+                                if self.all_player_pos[self.this_player_num] == c:
+                                    if num not in send_c:
+                                        send_c.append(num)
+                                    if "A" not in self.exchange:
+                                        self.exchange.append("A")
+
+                            get_c = []  # collect all players that are able to share cards (send)
                             for p in player:
                                 if p != self.this_player_num:
                                     if self.all_player_role[p] == 4:  # forscherin
                                         for c in self.all_player_cards[p]:
-                                            if c < 48:
-                                                get_c.append(c)
+                                            if c < 48 and p not in get_c:
+                                                if "D" not in self.exchange:
+                                                    self.exchange.append("D")
+                                                get_c.append(p)
                                     elif self.all_player_pos[self.this_player_num] in self.all_player_cards[p]:
-                                        get_c.append(self.all_player_pos[self.this_player_num])
+                                        if p not in get_c:
+                                            get_c.append(p)
+                                        if "B" not in self.exchange:
+                                            self.exchange.append("B")
 
-                            if len(get_c) == 0 and len(send_c) == 0:
-                                self.txt_action = "Keine Karten zu tauschen"
-                            else:
-                                pass
-                            # TODO Karten tauschen
+                            # if player has cards to send, add all other players to list as receivers
+                            if len(send_c) > 0:
+                                for p in player:
+                                    if p != self.this_player_num and p not in get_c:
+                                        get_c.append(p)
 
+                            # if player can send and receive, add this.player to playerselection
+                            if ("A" in self.exchange and "D" in self.exchange) \
+                                    or ("B" in self.exchange and "C" in self.exchange):
+                                get_c.append(self.this_player_num)
+                            # endregion
+
+                            # draw selection options
+                            self.draw_card_highlight(send_c, "#ff0000")
+                            self.draw_player_selection(get_c)
+
+                            if ("A" in self.exchange or "C" in self.exchange) \
+                                    and not ("B" in self.exchange and "D" in self.exchange):
+                                # send cards only
+                                self.this_player_exchange['sender'] = self.this_player_num
+                                self.txt_action = "Wähle Karte und Empfänger aus"
+                            elif ("B" in self.exchange or "D" in self.exchange) \
+                                    and not ("A" in self.exchange and "C" in self.exchange):
+                                # receive only
+                                self.this_player_exchange['receiver'] = self.this_player_num
+                                self.txt_action = "Wähle Kartengeber aus"
+                            elif ("A" in self.exchange and "D" in self.exchange) \
+                                        or ("B" in self.exchange and "C" in self.exchangec):
+                                # send and receive
+                                self.txt_action = "Wähle Empfänger und/oder Karte zum geben aus"
                         else:
                             self.txt_action = "Kein anderer Spieler in deiner Stadt."
 
-                        # city card = pos player a = pos player b
-                        # forscherin: (4) beliebige karte GEBEN
-                        pass
+                    if self.this_player_turns['sender'] == "CARD":
+                        c_num = self.this_player_turns['card']
+                        if c_num in self.this_player_card_selection:
+                            self.this_player_card_selection.remove(c_num)
+                            self.draw_card_highlight([c_num], "#ff0000")
+                        else:
+                            self.this_player_card_selection.append(c_num)
+                            self.draw_card_highlight([c_num], "#00ff00")
 
+                        if len(self.this_player_card_selection) == 1:
+                            # send cards only
+                            self.this_player_exchange['sender'] = self.this_player_num
+                            self.this_player_exchange['card'] = self.this_player_cards[c_num]
+                            if self.this_player_exchange['receiver'] is None:
+                                self.txt_action = "Wähle Empfänger aus"  # select receiver
+                            else:
+                                execute_change()
+
+                    if self.this_player_turns['sender'] == "PLAY":
+                        selected_player = self.this_player_turns['player']
+
+                        if ("A" in self.exchange or "C" in self.exchange) \
+                                and not ("B" in self.exchange and "D" in self.exchange):
+                            # send cards only
+                            self.this_player_exchange['receiver'] = selected_player
+                            if self.this_player_exchange['card'] is None:
+                                self.txt_action = "Wähle Karte aus."  # select card
+                                self.draw_player_selection()
+                            else:
+                                execute_change()
+                        elif ("B" in self.exchange or "D" in self.exchange) \
+                                and not ("A" in self.exchange and "C" in self.exchange):
+                            self.this_player_exchange['sender'] = selected_player
+                            self.draw_player_selection()
+                            execute_change()
+                        elif ("A" in self.exchange and "D" in self.exchange) \
+                                or ("B" in self.exchange and "C" in self.exchangec):
+                            if selected_player == self.this_player_num:
+                                # player is receiver
+                                self.this_player_exchange['receiver'] = selected_player
+                                self.draw_player_selection()
+                                execute_change()
+                            else:
+                                # player is sender
+                                self.this_player_exchange['sender'] = selected_player
+                                if self.this_player_exchange['card'] is None:
+                                    self.txt_action = "Wähle Karte aus."  # select card
+                                    self.draw_player_selection()
+                                else:
+                                    execute_change()
                 # ---  6 - healing ----------------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 6:
                     if self.this_player_turns['sender'] == "BTN":
-                        if self.city[self.all_player_pos[self.this_player_num]].get("center"):
+                        if self.city[self.all_player_pos[self.this_player_num]].get("c"):
                             self.this_player_card_selection = []
                             check = [0, 0, 0, 0]
                             for c in self.this_player_cards:
                                 if c <= 47:
-                                    check[self.city[c].get("farbe")] += 1
+                                    check[self.city[c].get("d")] += 1
                             for idf, f in enumerate(check):
                                 if f > 4 or (self.all_player_role[self.this_player_num] == 1 and f > 3):
                                     if self.healing[idf] == 0:
                                         selection = []
                                         for idc, c in enumerate(self.this_player_cards):
-                                            if self.city[c].get("farbe") == idf:
+                                            if self.city[c].get("d") == idf:
                                                 selection.append(idc)
 
                                         # self.this_player_turns['target'] = idf
@@ -1022,7 +1181,8 @@ class Client(tk.Tk):
                             remove_cards = []
                             for c in self.this_player_card_selection:
                                 remove_cards.append(self.this_player_cards[c])
-                            self.value = {'player': self.this_player_num,
+                            self.value = {'v': self.localversion,
+                                          'player': self.this_player_num,
                                           'cards': remove_cards}
                             self.this_player_card_selection = []
                             self._update('heal')
@@ -1036,8 +1196,12 @@ class Client(tk.Tk):
                         self.draw_city_highlight()
                         self.this_player_turns['turns_left'] -= self.this_player_turns['steps']
                         self.txt_action = ""
+                        move_player = self.logistician if self.logistician < 3 else self.this_player_num
+                        self.logistician = 5
                         # update server
-                        self.value = {'player': self.this_player_num,
+                        self.value = {'v': self.localversion,
+                                      'player': self.this_player_num,
+                                      'moveplayer': move_player,
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': []}
                         self._update('player_move')
@@ -1050,18 +1214,27 @@ class Client(tk.Tk):
                         self.draw_city_highlight()
                         self.this_player_turns['turns_left'] -= 1
                         self.txt_action = ""
+                        move_player = self.logistician if self.logistician < 3 else self.this_player_num
+                        self.logistician = 5
                         # update server
-                        self.value = {'player': self.this_player_num,
+                        self.value = {'v': self.localversion,
+                                      'player': self.this_player_num,
+                                      'moveplayer': move_player,
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': [self.this_player_turns['city']]}
                         self._update('player_move')
                 # --- 12 - fly charter ------------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 12:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
-                        if self.all_player_pos[self.this_player_num] in self.this_player_cards:
+                        if self.logistician < 3:
+                            pos = self.all_player_pos[self.logistician]
+                        else:
+                            pos = self.all_player_pos[self.this_player_num]
+
+                        if pos in self.this_player_cards:
                             self.txt_action = "Charterflug: Wähle Zielstadt."
                             allcitys = [x for x in range(48)]
-                            allcitys.remove(self.all_player_pos[self.this_player_num])
+                            allcitys.remove(pos)
                             self.draw_city_highlight(allcitys)
                         else:
                             self.draw_city_highlight()
@@ -1070,19 +1243,23 @@ class Client(tk.Tk):
                         self.draw_city_highlight()
                         self.this_player_turns['turns_left'] -= 1
                         self.txt_action = ""
+                        move_player = self.logistician if self.logistician < 3 else self.this_player_num
+                        self.logistician = 5
                         # update server
-                        self.value = {'player': self.this_player_num,
+                        self.value = {'v': self.localversion,
+                                      'player': self.this_player_num,
+                                      'moveplayer': move_player,
                                       'moveto': self.this_player_turns['city'],
-                                      'usedcards': [self.all_player_pos[self.this_player_num]]}
+                                      'usedcards': [self.all_player_pos[move_player]]}
                         self._update('player_move')
                 # --- 13 - fly special ------------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 13:
                     if self.this_player_turns['sender'] == "BTN":  # initialize action
-                        if self.city[self.all_player_pos[self.this_player_num]]['center']:
+                        if self.city[self.all_player_pos[self.this_player_num]]['c']:
                             self.txt_action = "Sonderflug: Wähle Zielstadt mit Forschungscenter."
                             citys = []
                             for c in self.city:
-                                if c['center']:
+                                if c['c']:
                                     citys.append(c['ID'])
                             citys.remove(self.all_player_pos[self.this_player_num])
                             self.draw_city_highlight(citys)
@@ -1093,11 +1270,30 @@ class Client(tk.Tk):
                         self.draw_city_highlight()
                         self.this_player_turns['turns_left'] -= 1
                         self.txt_action = ""
+                        move_player = self.logistician if self.logistician < 3 else self.this_player_num
+                        self.logistician = 5
                         # update server
-                        self.value = {'player': self.this_player_num,
+                        self.value = {'v': self.localversion,
+                                      'player': self.this_player_num,
+                                      'moveplayer': move_player,
                                       'moveto': self.this_player_turns['city'],
                                       'usedcards': []}
                         self._update('player_move')
+                # -- 14 - LOGISTIKER - select player ----------------------------------------------------------------- #
+                if self.this_player_turns['turn'] == 14:
+                    if self.this_player_turns['sender'] == "BTN":  # initialize action
+                        self.draw_city_highlight()
+                        selected_player = []
+                        for num, name in enumerate(self.all_player_name):
+                            if name != '':
+                                selected_player.append(num)
+                        _print(selected_player)
+                        self.draw_player_selection(selected_player, "LOG")
+                    if self.this_player_turns['sender'] == "PLAY":  # get player
+                        self.draw_player_selection()
+                        self.logistician = self.this_player_turns['player']
+                        self.txt_action = "Bewege " + self.all_player_name[self.logistician]
+
                 # --- 32 - end turn ---------------------------------------------------------------------------------- #
                 if self.this_player_turns['turn'] == 32 and self.this_player_turns['sender'] == "BTN":
                     self.this_player_turns = {'sender': "", 'turn': 99, 'turns_left': 0}
@@ -1161,7 +1357,6 @@ class Client(tk.Tk):
                         self.game_canvas.itemconfigure(self.i_quicktip, fill="")
                         self.txt_action = ""
                         self.this_player_turns["turn"] = 100
-                        self.value = self.this_player_num
                         del self.this_player_drawcards[0]
                         print(">>> EPIDEMIE >>>", str(self.this_player_drawcards))
                         self.this_player_turns['sender'] = ""
@@ -1174,14 +1369,15 @@ class Client(tk.Tk):
                         self.gameupdatelist['cards'].append(7)
                         self.this_player_turns["turn"] = 0
                         # update server -> do calculation online
-                        self.value = {'card': inf_card, 'epidemie': True}
+                        self.value = {'v': self.localversion,
+                                      'card': inf_card,
+                                      'epidemie': True}
                         self._update('update_inf')
                 # endregion
             else:
                 # INIT SUPPLY with drawing cards
                 if self.this_player_turns["turn"] == 99:
                     self.this_player_turns["turn"] = 0
-                    self.value = self.this_player_num
                     self._update('draw_playercard')
                 # SUPPLY is over start next STATE
                 else:
@@ -1203,14 +1399,14 @@ class Client(tk.Tk):
                     self.gameupdatelist['cards'].append(7)
 
                     # update server -> do calculation online
-                    self.value = {'card': inf_card}
+                    self.value = {'v': self.localversion,
+                                  'card': inf_card}
                     self._update('update_inf')
                 # endregion
             else:
                 # INIT INFECT with drawing cards
                 if self.this_player_turns["turn"] == 999:
                     self.this_player_turns["turn"] = 0
-                    self.value = self.this_player_num
                     self._update('draw_infcard')
                 # INFECT is over start next STATE -> next player
                 else:
@@ -1219,7 +1415,8 @@ class Client(tk.Tk):
                     self.txt_status = ""
                     self.game_canvas.itemconfigure(self.i_quicktip, fill="")
                     self.game_STATE = "PASSIV"
-                    self.value = self.this_player_num
+                    self.value = {'v': self.localversion,
+                                  'player_num': self.this_player_num}
                     self._update('turn_over')
 
         # endregion
@@ -1253,6 +1450,9 @@ class Client(tk.Tk):
                 if sender == "DIS_":  # clicked on disease-selection
                     self.this_player_turns['disease'] = int(args[0][4:])
 
+                if sender == "PLAY":  # clicked on disease-selection
+                    self.this_player_turns['player'] = int(args[0][4:])
+
                 self.this_player_turns['sender'] = sender
             # endregion
             # region ###### CLICK @ BAR/BTN ############################################################################
@@ -1273,7 +1473,7 @@ class Client(tk.Tk):
 
             self._update()
 
-    # region ------ INIT ---------------------------------------------------------------------------------------------------
+    # region ------ INIT -----------------------------------------------------------------------------------------------
     def game_init_update(self, args):
         def get_role_name(num):
             switcher = {
@@ -1327,7 +1527,7 @@ class Client(tk.Tk):
     def game_init_recon(self, args):
         _print()
         self.localversion = 0  # -> force update after recon
-        self.this_player_name = args.get("player")[self.this_player_num]
+        self.all_player_name = args.get("player")
         self.all_player_role = args.get("player_role")
         self.game_STATE = args.get("state")
         self.game_STATE = "WAIT"
@@ -1347,28 +1547,60 @@ class Client(tk.Tk):
             win_x = user32.GetSystemMetrics(0) - 20
             win_y = user32.GetSystemMetrics(1) - 60
 
-            win_x = int(win_x / 1.5)  # TODO DELETE THIS LINE #########################################################
-            win_y = int(win_y / 1.5)  # TODO DELETE THIS LINE #########################################################
-            self.geometry(str(win_x) + 'x' + str(win_y) + '+758+1')  # TODO change +758+1 to +2+2
+            if AM_DEBUG_OUTPUT:
+                win_x = int(win_x / 2)
+                win_y = int(win_y / 2)
+                if self.this_player_num == 0:
+                    self.geometry(str(win_x) + 'x' + str(win_y) + '+1280+2')
+                elif self.this_player_num == 1:
+                    self.geometry(str(win_x) + 'x' + str(win_y) + '+1280+780')
+                elif self.this_player_num == 2:
+                    self.geometry(str(win_x) + 'x' + str(win_y) + '+1+2')
+                elif self.this_player_num == 3:
+                    self.geometry(str(win_x) + 'x' + str(win_y) + '+1+780')
+            else:
+                self.geometry(str(win_x) + 'x' + str(win_y) + '+2+2')
 
             # self.display_game(None)
             self.lbl_empty.place(relx=0.5, rely=0.5, anchor=CENTER)
 
             self.game_STATE = 'PASSIV'
+            self.value = {'v': 0}
         return 'get_update'
-
     # endregion
 
     # region ------ MAINGAME -------------------------------------------------------------------------------------------
     def game_lose(self):
-        # TODO lose game
-        print("You lose.")
-        return 'getVersion'
+        self.game_STATE = "LOSE_GAME"
+        self.config(cursor="pirate")
+        _print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   You lose.")
+
+        s = int(self.winfo_height() * 0.66)
+
+        self.img_lose = ImageTk.PhotoImage(self.img_lose_raw.resize((s, s), Image.ANTIALIAS))
+        self.game_canvas.create_image(
+            int(self.section_game_w / 2), int(self.winfo_height() / 2),
+            image=self.img_lose,
+            anchor=CENTER)
+
+        self.running = False
+        return 'get_version'
 
     def game_win(self):
-        # TODO win game
-        print("WIN!")
-        return 'getVersion'
+        self.game_STATE = "WIN_GAME"
+        self.config(cursor="heart")
+        _print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   You win.")
+
+        s = int(self.winfo_height() * 0.66)
+
+        self.img_win = ImageTk.PhotoImage(self.img_win_raw.resize((s, s), Image.ANTIALIAS))
+        self.game_canvas.create_image(
+            int(self.section_game_w / 2), int(self.winfo_height() / 2),
+            image=self.img_win,
+            anchor=CENTER)
+
+        self.running = False
+        return 'get_version'
 
     def get_player_path(self, *args):
         def get_pre(pre_a, t):
@@ -1394,13 +1626,17 @@ class Client(tk.Tk):
                     if pre_append:
                         p_range.append(pre_s)
 
-        aktpos = self.all_player_pos[self.this_player_num]
+        if self.logistician > 3:
+            aktpos = self.all_player_pos[self.this_player_num]
+        else:
+            aktpos = self.all_player_pos[self.logistician]
+            print(aktpos)
 
         # get distance to specific city
         if len(args) > 0:
             target = args[0]
             path = [target]
-            while get_pre(aktpos, target) != self.all_player_pos[self.this_player_num]:
+            while get_pre(aktpos, target) != aktpos:
                 path.append(get_pre(aktpos, target))
                 target = get_pre(aktpos, target)
             return path
@@ -1450,84 +1686,134 @@ class Client(tk.Tk):
 
         return 'getVersion'
 
+    def check_exchange(self, sender, receiver, card):
+        fail = False
+
+        # fill empty fields with existing variables if existant
+        if sender is None:
+            sender = self.this_player_exchange['sender']
+        if receiver is None:
+            receiver = self.this_player_exchange['receiver']
+        if card is None:
+            card = self.this_player_exchange['card']
+
+        # sender must have citycard or be role 4
+        if sender is not None:
+            if self.all_player_role[sender] != 4 \
+                    and self.all_player_pos[sender] not in self.all_player_cards[sender]:
+                fail = True
+
+        # receiver must be in same city as sender
+        if sender is not None and receiver is not None:
+            if self.all_player_pos[sender] != self.all_player_pos[receiver]:
+                fail = True
+
+        # card must be citycard or sender is role 4
+        if card is not None and sender is not None:
+            if self.all_player_role[sender] != 4 and card not in self.all_player_cards[sender]:
+                fail = True
+
+        return not fail
+
+    def exchange_card(self, card_exchange):
+        _print()
+
+        # card_exchange = {'status': "request", 'sender': 2, 'card': 2, 'receiver': 0}
+
+        # update only when new request
+        if self.this_player_exchange != card_exchange:
+            self.this_player_exchange = card_exchange
+            # check if player is participant
+            if card_exchange['sender'] == self.this_player_num and self.game_STATE == "PASSIV":
+                print("player is sender")
+                self.txt_action = str(self.all_player_name[card_exchange['sender']]) + \
+                                  " möchte eine Karte von dir haben"
+                for num, c in enumerate(self.this_player_cards):
+                    if self.check_exchange(self.this_player_num,
+                                           card_exchange['receiver'],
+                                           c):
+                        self.this_player_card_selection.append(num)
+                        self.draw_card_highlight([num], "#00ff00")
+            elif card_exchange['receiver'] == self.this_player_num:
+                print("player is receiver")
+                self.txt_action = "Du erhältst eine Karte von " + str(self.all_player_name[card_exchange['sender']])
+                self.this_player_drawcards.append(card_exchange['card'])
+                self.gameupdatelist['cards'].append(7)
+                self.draw_card_highlight()
+            elif card_exchange['sender'] is None and card_exchange['receiver'] is None \
+                    and self.game_STATE == "PASSIV":
+                self.txt_status = self.all_player_name[self.current_player] + " ist am Zug."
+
+        # remove highlight
+        # self.draw_card_highlight(None)
+
+    def report_error(self, error):
+        _print(error)
+        self.value = {'v': self.localversion,
+                      'e': error}
+        self._update('error')
     # endregion
 
     # region ###### DRAW ###############################################################################################
-
     def game_update(self, args):
-        # region info read data ########################################################################################
-        # v = serverversion,
-        # cur_player = current_player,
-        # data = []
-        # [ 0..47] = cities -> 5 values
-        # [48..51] = playercards -> 7 values
-        # [52] = stats -> 11 values {outbreak, inflvl, supplies,
-        #                            inf0, inf1, inf2, inf3,
-        #                            healing0, healing1, healing2, healing3}
-        # [53] = player_pos -> 4 values
-        # endregion ####################################################################################################
-
         _print()
-        data = args.get("data")
 
-        self.current_player = args.get('cur_player')
+        if 'city' in args:
+            for num, c in enumerate(args.get("city")):
+                akt_c = self.city[num]['i'], self.city[num]['c']
+                if akt_c != ([c[0], c[1], c[2], c[3]], c[4]):
+                    self.city[num]['i'][0] = c[0]
+                    self.city[num]['i'][1] = c[1]
+                    self.city[num]['i'][2] = c[2]
+                    self.city[num]['i'][3] = c[3]
+                    self.city[num]['c'] = c[4]
+                    self.gameupdatelist['city'].append(num)
 
-        # cities
-        for c in range(0, 48):
-            akt_c = self.city[c]['i0'], self.city[c]['i1'], self.city[c]['i2'], self.city[c]['i3'], \
-                    self.city[c]['center']
-            if akt_c != (data[c][0], data[c][1], data[c][2], data[c][3], data[c][4]):
-                self.city[c]['i0'] = data[c][0]
-                self.city[c]['i1'] = data[c][1]
-                self.city[c]['i2'] = data[c][2]
-                self.city[c]['i3'] = data[c][3]
-                self.city[c]['center'] = data[c][4]
-                self.gameupdatelist['city'].append(c)
-
-        # cards
-        if self.this_player_cards != data[self.this_player_num + 48]:
-
-            r = len(self.this_player_cards) if len(self.this_player_cards) < len(data[self.this_player_num + 48]) \
-                else len(data[self.this_player_num + 48])
-            for c in range(0, 7):
-                if c < r:
-                    if self.this_player_cards[c] != data[self.this_player_num + 48][c]:
+        if 'cards' in args:
+            self.all_player_cards = args.get("cards")[0]
+            cards = self.all_player_cards[self.this_player_num]
+            if self.this_player_cards != cards:
+                r = len(self.this_player_cards) if len(self.this_player_cards) < len(cards) \
+                    else len(cards)
+                for c in range(0, 7):
+                    if c < r:
+                        if self.this_player_cards[c] != cards[c]:
+                            self.gameupdatelist['cards'].append(c)
+                    else:
                         self.gameupdatelist['cards'].append(c)
-                else:
-                    self.gameupdatelist['cards'].append(c)
-            self.this_player_cards = data[self.this_player_num + 48]
+                self.this_player_cards = cards
+            self.exchange_card(args.get("cards")[1])
 
-        for p in range(0, 4):
-            self.all_player_cards[p] = data[p + 48]
+        if 'stats' in args:
+            stats = args.get("stats")
+            akt_m = self.outbreak, self.inflvl, self.supplies
+            if akt_m != (stats[0], stats[1], stats[2]):
+                self.outbreak = stats[0]
+                self.inflvl = stats[1]
+                self.supplies = stats[2]
+                self.gameupdatelist['marker1'] = 1
 
-        # marker
-        akt_m = self.outbreak, self.inflvl, self.supplies
-        if akt_m != (data[52][0], data[52][1], data[52][2]):
-            self.outbreak = data[52][0]
-            self.inflvl = data[52][1]
-            self.supplies = data[52][2]
-            self.gameupdatelist['marker1'] = 1
+            count = 0
+            for i in range(0, 4):
+                if self.infection[i] != stats[3 + i]:
+                    count = 1
+                self.infection[i] = stats[3 + i]
+            if count > 0:
+                self.gameupdatelist['marker1'] = 1
 
-        count = 0
-        for i in range(0, 4):
-            if self.infection[i] != data[52][3 + i]:
-                count = 1
-            self.infection[i] = data[52][3 + i]
-        if count > 0:
-            self.gameupdatelist['marker1'] = 1
+            count = 0
+            for i in range(0, 4):
+                if self.healing[i] != stats[7 + i]:
+                    count = 1
+                self.healing[i] = stats[7 + i]
+            if count > 0:
+                self.gameupdatelist['marker2'] = 1
 
-        count = 0
-        for i in range(0, 4):
-            if self.healing[i] != data[52][7 + i]:
-                count = 1
-            self.healing[i] = data[52][7 + i]
-        if count > 0:
-            self.gameupdatelist['marker2'] = 1
-
-        # player pos
-        if self.all_player_pos != data[53]:
-            self.all_player_pos = data[53]
-            self.gameupdatelist['playerpos'] = 1
+        if 'player' in args:
+            if self.all_player_pos != args.get('player')[0]:
+                self.all_player_pos = args.get('player')[0]
+                self.gameupdatelist['playerpos'] = 1
+            self.current_player = args.get('player')[1]
 
         # update version
         self.localversion = args.get("v")
@@ -1577,7 +1863,6 @@ class Client(tk.Tk):
             # canvas
             self.game_canvas = ResizingCanvas(self.game_frame, width=self.section_game_w, height=game_h,
                                               bg="#333", highlightthickness=0)
-            # TODO CHECK!!! self.game_canvas.bind("<Button-1>", self.game_click)
             self.game_canvas.pack()
 
             # infotext
@@ -1617,26 +1902,45 @@ class Client(tk.Tk):
                 am_rect(0, self.section_action + 8, self.section_game_w, int(self.section_game_w / 34)),
                 fill="#282828", outline='#3a3a3a')
 
-            # prepare healing icons
+            # prepare additional icons
             heal_w = (float(self.section_game_w) / 34) / 100 * 75
-            self.img_heal[0] = ImageTk.PhotoImage(
-                self.img_heal_raw[0].resize((int(heal_w), int(heal_w)), Image.ANTIALIAS))
-            self.img_heal[1] = ImageTk.PhotoImage(
-                self.img_heal_raw[1].resize((int(heal_w), int(heal_w)), Image.ANTIALIAS))
+            for num in range(0, 2):
+                self.img_icon[num] = ImageTk.PhotoImage(self.img_icon_raw[num].
+                                                        resize((int(heal_w), int(heal_w)), Image.ANTIALIAS))
+            icon_s = int((float(self.section_game_w) / 34))
+            for num in range(2, 6):
+                self.img_icon[num] = ImageTk.PhotoImage(self.img_icon_raw[num].
+                                                        resize((icon_s, icon_s), Image.ANTIALIAS))
+
+            # prepare player card and name
+            self.img_char[self.all_player_role[self.this_player_num]] = \
+                ImageTk.PhotoImage(self.img_char_raw[self.all_player_role[self.this_player_num]]
+                                   .resize((card_w, card_h), Image.ANTIALIAS))
 
             # DRAW -----------------------------------------------------------------------------------------------------
+            # player name and card
+            x = 8
+            y = int(self.section_field - 8)
+            self.game_canvas.create_image(x, y,
+                                          image=self.img_char[self.all_player_role[self.this_player_num]],
+                                          anchor=SW)
+            self.game_canvas.create_text(8, (y-card_h - 2),
+                                         text=self.all_player_name[self.this_player_num],
+                                         fill="#ffffff",
+                                         anchor=SW,
+                                         font=('Helvetica', 10, 'bold'))
+
+            # cards
             for c in range(0, len(self.this_player_cards)):
                 self.draw_cards(c)
 
             for c in range(0, 48):  # loop through citys
                 self.draw_cities(c)
+
             self.draw_overlay_game()
             self.draw_player()
-
             self.draw_marker(1)
-            # self.draw_overlay_status()
             self.draw_marker(2)
-
             self.draw_bar()
 
             # BTN
@@ -1659,18 +1963,35 @@ class Client(tk.Tk):
             self.game_canvas.create_rectangle(am_rect(4 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(5 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(6 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(7 * btnx, btny, btns, btns), param)
+
             self.game_canvas.create_rectangle(am_rect(10 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(11 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(12 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(13 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(14 * btnx, btny, btns, btns), param)
-            self.game_canvas.create_rectangle(am_rect(15 * btnx, btny, btns, btns), param)
-
-            self.game_canvas.create_rectangle(am_rect(17 * btnx, btny, btns, btns), param)
 
             self.game_canvas.create_rectangle(am_rect(32 * btnx, btny, btns, btns), param)
             self.game_canvas.create_rectangle(am_rect(33 * btnx, btny, btns, btns), param)
+
+            # aoptional additional icons
+            if self.all_player_role[self.this_player_num] == 3:  # Krisenmanager
+                self.game_canvas.create_image(7 * btnx, btny,
+                                              image=self.img_icon[4],
+                                              anchor=NW,
+                                              tags="icon_4")
+                self.game_canvas.create_rectangle(am_rect(7 * btnx, btny, btns, btns), param)
+
+            if self.all_player_role[self.this_player_num] == 5:  # Logistiker
+                self.game_canvas.create_image(14 * btnx, btny,
+                                              image=self.img_icon[3],
+                                              anchor=NW,
+                                              tags="icon_3")
+                self.game_canvas.create_rectangle(am_rect(14 * btnx, btny, btns, btns), param)
+
+                self.game_canvas.create_image(15 * btnx, btny,
+                                              image=self.img_icon[2],
+                                              anchor=NW,
+                                              tags="icon_2")
+                self.game_canvas.create_rectangle(am_rect(15 * btnx, btny, btns, btns), param)
 
             self.i_quicktip = self.game_canvas.create_text(0, 0, text="", fill="", anchor=S,
                                                            font=('Helvetica', 10), tags="info")
@@ -1723,14 +2044,14 @@ class Client(tk.Tk):
         # temporary infection item for current city
         infection = [{'i': 0, 'value': 0}, {'i': 1, 'value': 0}, {'i': 2, 'value': 0}, {'i': 3, 'value': 0}]
         for i in range(0, 4):
-            infection[i]['value'] = c.get('i' + str(i))
+            infection[i]['value'] = c['i'][i]
 
         # sort infection (highest value first -> highest infection will be drawn on most inner ring
         infection.sort(key=inf_value, reverse=True)
 
         # get anchor-position of city (center)
-        x = int(c.get('posX') * float(int(self.section_game_w)) / 100)
-        y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
+        x = int(c.get('X') * float(int(self.section_game_w)) / 100)
+        y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
 
         for i in range(0, 4):  # loop infection rings
             if infection[i].get('value') > 0:
@@ -1744,9 +2065,9 @@ class Client(tk.Tk):
             else:
                 break
 
-        if c.get('center') == 1:
-            x = int(c.get('posX') * float(int(self.section_game_w)) / 100) - int(s_cen / 120 * 82)
-            y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + int(
+        if c.get('c') == 1:
+            x = int(c.get('X') * float(int(self.section_game_w)) / 100) - int(s_cen / 120 * 82)
+            y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + int(
                 s_cen / 120 * 50)
             self.game_canvas.create_image(x, y,
                                           image=self.img_center,
@@ -1762,8 +2083,8 @@ class Client(tk.Tk):
             size = int(self.section_game_w / 35)
 
             # get anchor-position of city (center)
-            x = int(c.get('posX') * float(int(self.section_game_w)) / 100) + size / 2
-            y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + 15
+            x = int(c.get('X') * float(int(self.section_game_w)) / 100) + size / 2
+            y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + 15
 
             pos = 0
             for i in range(0, 4):
@@ -1788,6 +2109,46 @@ class Client(tk.Tk):
                     pos += 1
                     self.game_canvas.tag_bind(diseasetag, "<ButtonRelease-1>",
                                               lambda event, t=diseasetag: self.game_click(event, t))
+
+    def draw_player_selection(self, *args):
+        self.game_canvas.delete("player_selection")
+        if len(args) > 0:  # draw selection
+            players = args[0]
+            c = self.city[self.all_player_pos[players[0]]]
+            card_h = self.section_card - 8
+            size = int(self.section_game_w / 35)
+
+            if len(args) <= 1:  # if second argument -> draw for logistiker
+                # get anchor-position of city (center)
+                x = int(c.get('X') * float(int(self.section_game_w)) / 100) + size / 2
+                y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16)) + 15
+            else:
+                x = int((float(self.section_game_w) / 34) * 14)
+                y = self.section_field - size - 8
+
+            for pos, p in enumerate(players):
+                role = self.all_player_role[p]
+                param = dict(activeoutline="#ffffff", activewidth=2)
+                switcher = {
+                    1: "#d6d7df",
+                    2: "#245a49",
+                    3: "#52aedb",
+                    4: "#8f5735",
+                    5: "#cf63ae",
+                    6: "#ee7024",
+                    7: "#7ab851",
+                }
+                param['fill'] = switcher.get(role)
+                param['activefill'] = switcher.get(role)
+                param['outline'] = switcher.get(role)
+
+                playertag = "PLAY" + str(p)
+                param['tags'] = "player_selection", playertag
+
+                self.game_canvas.create_oval(x + (size + 5) * pos, y, x + (size + 5) * pos + size, y + size, param)
+
+                self.game_canvas.tag_bind(playertag, "<ButtonRelease-1>",
+                                          lambda event, t=playertag: self.game_click(event, t))
 
     def draw_cards(self, card_num):
         self.game_canvas.delete("card" + str(card_num))
@@ -1848,17 +2209,17 @@ class Client(tk.Tk):
         h_ply = s_cen * 175 / 120
         w_ply = s_cen * 80 / 120
         for c in self.city:
-            c['pincity'] = 0  # reset player
+            draw_pos = 0  # reset player
             for p in range(0, 4):
                 if self.all_player_pos[p] == c.get('ID') and self.all_player_role[p] != 0:
-                    c['pincity'] += 1
+                    draw_pos += 1
                     self.img_p[self.all_player_role[p] - 1] = ImageTk.PhotoImage(
                         self.img_p_raw[self.all_player_role[p] - 1]
                             .resize((int(w_ply), int(h_ply)), Image.ANTIALIAS))
-                    x = int(c.get('posX') * float(int(self.section_game_w)) / 100) \
+                    x = int(c.get('X') * float(int(self.section_game_w)) / 100) \
                         - int(s_cen / 120 * 39) \
-                        + int(s_cen / 120 * 52) * c.get('pincity')
-                    y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (self.section_card + 8)) \
+                        + int(s_cen / 120 * 52) * draw_pos
+                    y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (self.section_card + 8)) \
                         - int(s_cen / 120 * 41)
                     self.game_canvas.create_image(
                         x, y, image=self.img_p[self.all_player_role[p] - 1], anchor=CENTER, tags="player")
@@ -1930,10 +2291,10 @@ class Client(tk.Tk):
             for h in range(0, 4):
                 if self.healing[h] == 1:
                     self.game_canvas.create_image(int(heal_x + heal_w * h), heal_y,
-                                                  image=self.img_heal[0], anchor=NW, tags="m2")
+                                                  image=self.img_icon[0], anchor=NW, tags="m2")
                 if self.healing[h] == 2:
                     self.game_canvas.create_image(int(heal_x + heal_w * h), heal_y,
-                                                  image=self.img_heal[1], anchor=NW, tags="m2")
+                                                  image=self.img_icon[1], anchor=NW, tags="m2")
             self.gameupdatelist['marker2'] = 0
 
     def draw_overlay_bar(self):
@@ -1960,14 +2321,17 @@ class Client(tk.Tk):
         card_h = int((self.section_game_w - 72) / 8 / 7 * 10)
 
         if len(args) > 0:
-            param = dict(fill="#000000", stipple=trans, activefill="", activestipple=trans, activewidth=3,
-                         tags="card_highlight_sel")
-            param['outline'] = args[1]
-            param['activeoutline'] = args[1]
-            for bg in args[0]:
-                self.game_canvas.create_rectangle(
-                    am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), param)
-            self.game_canvas.tag_bind("card_highlight_sel", "<ButtonRelease-1>", self.game_click)
+            if args[0] is None:
+                self.game_canvas.delete("card_highlight_sel")
+            else:
+                param = dict(fill="#000000", stipple=trans, activefill="", activestipple=trans, activewidth=3,
+                             tags="card_highlight_sel")
+                param['outline'] = args[1]
+                param['activeoutline'] = args[1]
+                for bg in args[0]:
+                    self.game_canvas.create_rectangle(
+                        am_rect(6 + (8 + card_w) * bg, 6, card_w + 4, card_h + 4), param)
+                self.game_canvas.tag_bind("card_highlight_sel", "<ButtonRelease-1>", self.game_click)
         else:  # default
             self.game_canvas.delete("card_highlight_sel")
             if len(self.this_player_drawcards) > 0:
@@ -1984,7 +2348,7 @@ class Client(tk.Tk):
                         outline="#ff0000", fill="#000000", stipple=trans,
                         activeoutline="#ff0000", activefill="", activestipple=trans, activewidth=3,
                         tags="card_highlight")
-                    if self.game_STATE == "SUPPLY":
+                    if self.game_STATE == "SUPPLY" or self.game_STATE == "PASSIV":
                         for bg in range(0, 7):
                             if bg < len(self.this_player_cards):
                                 self.game_canvas.create_rectangle(
@@ -2012,8 +2376,8 @@ class Client(tk.Tk):
                     card_h = self.section_card - 8
 
                     # get anchor-position of city (center)
-                    x = int(c.get('posX') * float(int(self.section_game_w)) / 100)
-                    y = int(c.get('posY') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
+                    x = int(c.get('X') * float(int(self.section_game_w)) / 100)
+                    y = int(c.get('Y') * float(int(self.section_game_w / 2.125) / 100) + (card_h + 16))
                     r = (self.section_game_w * 0.0125)
 
                     citytag = "CITY" + str(aw)
@@ -2036,14 +2400,13 @@ class Client(tk.Tk):
                 4: "Krankheit behandeln",
                 5: "Wissen teilen",
                 6: "Heilmittel entdecken",
-                7: "special",
+                7: "Krisenmanager",
                 10: "Autofahrt/Schifffahrt",
                 11: "Direktflug",
                 12: "Charterflug",
                 13: "Sonderflug",
-                14: "c1",
-                15: "c2",
-                17: "execute",
+                14: "Bewege anderen Spieler",
+                15: "Aktion Logistiker",
                 32: "Zug beenden",
                 33: "reload"
             }
@@ -2065,6 +2428,8 @@ class Client(tk.Tk):
                         text = "Karte verwerfen"
                     if self.game_STATE == "INFECT":
                         text = "Infizieren"
+                    if self.game_STATE == "PASSIV":
+                        text = "Karte nicht annehmen"
                 else:
                     text = "Epidemie auslösen"
 

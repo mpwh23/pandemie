@@ -12,25 +12,8 @@ from tkinter import ttk
 from tkinter import *
 from threading import Thread
 import math
-import time  # TODO remove
 
 from Pandemie import libserver
-
-# Pandemie Server
-#
-#                                                                           Start Server UI
-#                                                                                  │
-# Server                                          <────────── start server ────────┤
-#   -> init connection                                                             └ check Status every second
-#       try to read own external IP (https://api.ipify.org/)
-#       stores IP via PHP on moja.de
-#   -> init game variable
-#   -> START Game-Server
-#       │
-#     Status: "INIT"
-#       ├ awaits request
-#
-#
 
 
 class Server(Thread):
@@ -65,13 +48,18 @@ class Server(Thread):
         # endregion
 
         # region gamevariables #########################################################################################
-        self.serverversion = 0
+        self.server_version = 0
+        self.server_subversion = {0: {'city': 0, 'cards': 0, 'stats': 0, 'player': 0}}
+
+        self.error_message = ""
+
         self.game_STATE = "INIT"
         self.player_name = ["", "", "", ""]
         self.player_role = [0, 0, 0, 0]
         self.player_rdy = [0, 0, 0, 0]
         self.player_cards = [[], [], [], []]    # in data2send included
         self.player_pos = [2, 2, 2, 2]
+        self.card_exchange = {'status': None, 'sender': None, 'card': None, 'receiver': None}
 
         self.current_player = 0
 
@@ -109,7 +97,7 @@ class Server(Thread):
         # insert append remove count from 0 random.shuffle(x)
 
         # ID:       [1..48] continuous number
-        # farbe:    [0..3]  color of infection
+        # d:    [0..3]  color of infection
         # v1:       #       connection to other city. if = 0 -> no connection
         # v2:
         # v3
@@ -123,89 +111,60 @@ class Server(Thread):
         # center':  bool    is a center in the city, default:0, Atlanta (ID: 3): 1
         # name':    str     eg. 'San Francisco'
         #
-        self.city = [{'ID':  0, 'farbe': 0, 'con': [1, 12, 39, 46],              'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5864, 'name': 'San Francisco'},
-                     {'ID':  1, 'farbe': 0, 'con': [0, 12, 13,  2,  3],          'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9121, 'name': 'Chicago'},
-                     {'ID':  2, 'farbe': 0, 'con': [1,  5, 14],                  'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop':  4715, 'name': 'Atlanta'},
-                     {'ID':  3, 'farbe': 0, 'con': [1,  5,  4],                  'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3429, 'name': 'Montréal'},
-                     {'ID':  4, 'farbe': 0, 'con': [3,  5,  6,  7],              'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20464, 'name': 'New York'},
-                     {'ID':  5, 'farbe': 0, 'con': [ 4,  3,  2, 14],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4679, 'name': 'Washington'},
-                     {'ID':  6, 'farbe': 0, 'con': [ 4, 19, 24,  8,  7],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5427, 'name': 'Madrid'},
-                     {'ID':  7, 'farbe': 0, 'con': [ 4,  6,  8,  9],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8586, 'name': 'London'},
-                     {'ID':  8, 'farbe': 0, 'con': [ 7,  6, 24, 10,  9],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10755, 'name': 'Paris'},
-                     {'ID':  9, 'farbe': 0, 'con': [ 7,  8, 10, 11],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':   575, 'name': 'Essen'},
-                     {'ID': 10, 'farbe': 0, 'con': [ 9,  8, 26],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5232, 'name': 'Mailand'},
-                     {'ID': 11, 'farbe': 0, 'con': [ 9, 26, 27],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4879, 'name': 'St. Petersburg'},
-                     {'ID': 12, 'farbe': 1, 'con': [47, 13,  1,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14900, 'name': 'Los Angeles'},
-                     {'ID': 13, 'farbe': 1, 'con': [12, 16, 15, 14,  1],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 19463, 'name': 'Mexico Stadt'},
-                     {'ID': 14, 'farbe': 1, 'con': [13, 15,  5,  2],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5582, 'name': 'Miami'},
-                     {'ID': 15, 'farbe': 1, 'con': [13, 16, 18, 19, 14],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8102, 'name': 'Bogotá'},
-                     {'ID': 16, 'farbe': 1, 'con': [13, 17, 15],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10479, 'name': 'Lima'},
-                     {'ID': 17, 'farbe': 1, 'con': [16],                         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6015, 'name': 'Santiago'},
-                     {'ID': 18, 'farbe': 1, 'con': [15, 19],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13639, 'name': 'Buenos Aires'},
-                     {'ID': 19, 'farbe': 1, 'con': [15, 18, 20,  6],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20186, 'name': 'Sao Paulo'},
-                     {'ID': 20, 'farbe': 1, 'con': [19, 21, 23],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 11547, 'name': 'Lagos'},
-                     {'ID': 21, 'farbe': 1, 'con': [20, 22, 23],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9046, 'name': 'Kinshasa'},
-                     {'ID': 22, 'farbe': 1, 'con': [21, 23],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3888, 'name': 'Johannisburg'},
-                     {'ID': 23, 'farbe': 1, 'con': [20, 21, 22, 25],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4887, 'name': 'Khartum'},
-                     {'ID': 24, 'farbe': 2, 'con': [ 6, 25, 26,  8],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2946, 'name': 'Algier'},
-                     {'ID': 25, 'farbe': 2, 'con': [24, 23, 29, 28, 26],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14718, 'name': 'Kairo'},
-                     {'ID': 26, 'farbe': 2, 'con': [24, 25, 28, 27, 11, 10],     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13576, 'name': 'Istanbul'},
-                     {'ID': 27, 'farbe': 2, 'con': [11, 26, 30],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop': 15512, 'name': 'Moskau'},
-                     # TODO REMOVE CENTER FR#############################################################################################
-                     {'ID': 28, 'farbe': 2, 'con': [26, 25, 29, 31, 30],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6204, 'name': 'Bagdad'},
-                     {'ID': 29, 'farbe': 2, 'con': [25, 31, 28],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5037, 'name': 'Riad'},
-                     {'ID': 30, 'farbe': 2, 'con': [27, 28, 31, 33],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7419, 'name': 'Teheran'},
-                     {'ID': 31, 'farbe': 2, 'con': [28, 29, 32, 33, 30],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20711, 'name': 'Karatschi'},
-                     {'ID': 32, 'farbe': 2, 'con': [31, 34, 33],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 16910, 'name': 'Mumbai'},
-                     {'ID': 33, 'farbe': 2, 'con': [30, 31, 32, 34, 35],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22242, 'name': 'Delhi'},
-                     {'ID': 34, 'farbe': 2, 'con': [32, 44, 40, 35, 33],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8865, 'name': 'Chennai'},
-                     {'ID': 35, 'farbe': 2, 'con': [33, 34, 40, 41],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14374, 'name': 'Kalkutta'},
-                     {'ID': 36, 'farbe': 3, 'con': [37, 38],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 17311, 'name': 'Peking'},
-                     {'ID': 37, 'farbe': 3, 'con': [36, 38, 39],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22547, 'name': 'Seoul'},
-                     {'ID': 38, 'farbe': 3, 'con': [36, 41, 42, 39, 37],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13482, 'name': 'Shanghai'},
-                     {'ID': 39, 'farbe': 3, 'con': [37, 38, 43,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13189, 'name': 'Tokyo'},
-                     {'ID': 40, 'farbe': 3, 'con': [34, 44, 45, 41, 35],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7151, 'name': 'Bangkok'},
-                     {'ID': 41, 'farbe': 3, 'con': [35, 40, 45, 46, 42, 38],     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7106, 'name': 'Hong Kong'},
-                     {'ID': 42, 'farbe': 3, 'con': [41, 46, 43, 38],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8338, 'name': 'Taipeh'},
-                     {'ID': 43, 'farbe': 3, 'con': [39, 42],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2871, 'name': 'Osaka'},
-                     {'ID': 44, 'farbe': 3, 'con': [34, 47, 45, 40],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 26063, 'name': 'Jakarta'},
-                     {'ID': 45, 'farbe': 3, 'con': [44, 46, 41, 40],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8314, 'name': 'Ho-Chi-MinH-Stadt'},
-                     {'ID': 46, 'farbe': 3, 'con': [45, 47,  0, 42, 41],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20767, 'name': 'Manila'},
-                     {'ID': 47, 'farbe': 3, 'con': [46, 44, 12],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3785, 'name': 'Sydney'}]
+        self.city = [  # d = disease, i = infection
+            {'ID':  0, 'd': 0, 'con': [1, 12, 39, 46],              'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5864, 'name': 'San Francisco'},
+            {'ID':  1, 'd': 0, 'con': [0, 12, 13,  2,  3],          'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9121, 'name': 'Chicago'},
+            {'ID':  2, 'd': 0, 'con': [1,  5, 14],                  'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop':  4715, 'name': 'Atlanta'},
+            {'ID':  3, 'd': 0, 'con': [1,  5,  4],                  'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3429, 'name': 'Montréal'},
+            {'ID':  4, 'd': 0, 'con': [3,  5,  6,  7],              'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20464, 'name': 'New York'},
+            {'ID':  5, 'd': 0, 'con': [ 4,  3,  2, 14],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4679, 'name': 'Washington'},
+            {'ID':  6, 'd': 0, 'con': [ 4, 19, 24,  8,  7],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5427, 'name': 'Madrid'},
+            {'ID':  7, 'd': 0, 'con': [ 4,  6,  8,  9],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8586, 'name': 'London'},
+            {'ID':  8, 'd': 0, 'con': [ 7,  6, 24, 10,  9],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10755, 'name': 'Paris'},
+            {'ID':  9, 'd': 0, 'con': [ 7,  8, 10, 11],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':   575, 'name': 'Essen'},
+            {'ID': 10, 'd': 0, 'con': [ 9,  8, 26],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5232, 'name': 'Mailand'},
+            {'ID': 11, 'd': 0, 'con': [ 9, 26, 27],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4879, 'name': 'St. Petersburg'},
+            {'ID': 12, 'd': 1, 'con': [47, 13,  1,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14900, 'name': 'Los Angeles'},
+            {'ID': 13, 'd': 1, 'con': [12, 16, 15, 14,  1],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 19463, 'name': 'Mexico Stadt'},
+            {'ID': 14, 'd': 1, 'con': [13, 15,  5,  2],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 1, 'pop':  5582, 'name': 'Miami'},  # TODO remove center
+            {'ID': 15, 'd': 1, 'con': [13, 16, 18, 19, 14],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8102, 'name': 'Bogotá'},
+            {'ID': 16, 'd': 1, 'con': [13, 17, 15],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 10479, 'name': 'Lima'},
+            {'ID': 17, 'd': 1, 'con': [16],                         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6015, 'name': 'Santiago'},
+            {'ID': 18, 'd': 1, 'con': [15, 19],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13639, 'name': 'Buenos Aires'},
+            {'ID': 19, 'd': 1, 'con': [15, 18, 20,  6],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20186, 'name': 'Sao Paulo'},
+            {'ID': 20, 'd': 1, 'con': [19, 21, 23],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 11547, 'name': 'Lagos'},
+            {'ID': 21, 'd': 1, 'con': [20, 22, 23],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  9046, 'name': 'Kinshasa'},
+            {'ID': 22, 'd': 1, 'con': [21, 23],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3888, 'name': 'Johannisburg'},
+            {'ID': 23, 'd': 1, 'con': [20, 21, 22, 25],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  4887, 'name': 'Khartum'},
+            {'ID': 24, 'd': 2, 'con': [ 6, 25, 26,  8],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2946, 'name': 'Algier'},
+            {'ID': 25, 'd': 2, 'con': [24, 23, 29, 28, 26],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14718, 'name': 'Kairo'},
+            {'ID': 26, 'd': 2, 'con': [24, 25, 28, 27, 11, 10],     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13576, 'name': 'Istanbul'},
+            {'ID': 27, 'd': 2, 'con': [11, 26, 30],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 15512, 'name': 'Moskau'},
+            {'ID': 28, 'd': 2, 'con': [26, 25, 29, 31, 30],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  6204, 'name': 'Bagdad'},
+            {'ID': 29, 'd': 2, 'con': [25, 31, 28],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  5037, 'name': 'Riad'},
+            {'ID': 30, 'd': 2, 'con': [27, 28, 31, 33],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7419, 'name': 'Teheran'},
+            {'ID': 31, 'd': 2, 'con': [28, 29, 32, 33, 30],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20711, 'name': 'Karatschi'},
+            {'ID': 32, 'd': 2, 'con': [31, 34, 33],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 16910, 'name': 'Mumbai'},
+            {'ID': 33, 'd': 2, 'con': [30, 31, 32, 34, 35],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22242, 'name': 'Delhi'},
+            {'ID': 34, 'd': 2, 'con': [32, 44, 40, 35, 33],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8865, 'name': 'Chennai'},
+            {'ID': 35, 'd': 2, 'con': [33, 34, 40, 41],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 14374, 'name': 'Kalkutta'},
+            {'ID': 36, 'd': 3, 'con': [37, 38],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 17311, 'name': 'Peking'},
+            {'ID': 37, 'd': 3, 'con': [36, 38, 39],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 22547, 'name': 'Seoul'},
+            {'ID': 38, 'd': 3, 'con': [36, 41, 42, 39, 37],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13482, 'name': 'Shanghai'},
+            {'ID': 39, 'd': 3, 'con': [37, 38, 43,  0],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 13189, 'name': 'Tokyo'},
+            {'ID': 40, 'd': 3, 'con': [34, 44, 45, 41, 35],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7151, 'name': 'Bangkok'},
+            {'ID': 41, 'd': 3, 'con': [35, 40, 45, 46, 42, 38],     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  7106, 'name': 'Hong Kong'},
+            {'ID': 42, 'd': 3, 'con': [41, 46, 43, 38],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8338, 'name': 'Taipeh'},
+            {'ID': 43, 'd': 3, 'con': [39, 42],                     'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  2871, 'name': 'Osaka'},
+            {'ID': 44, 'd': 3, 'con': [34, 47, 45, 40],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 26063, 'name': 'Jakarta'},
+            {'ID': 45, 'd': 3, 'con': [44, 46, 41, 40],             'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  8314, 'name': 'Ho-Chi-MinH-Stadt'},
+            {'ID': 46, 'd': 3, 'con': [45, 47,  0, 42, 41],         'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop': 20767, 'name': 'Manila'},
+            {'ID': 47, 'd': 3, 'con': [46, 44, 12],                 'i0': 0, 'i1': 0, 'i2': 0, 'i3': 0, 'center': 0, 'pop':  3785, 'name': 'Sydney'}]
         # endregion
 
         self.start()
 
     # region functions #################################################################################################
-    def data2send(self):
-        # TODO optional better structure
-        ##########################################################
-        data = []
-        # [ 0..47] = cities -> 5 values
-        # [48..51] = playercards -> x values
-        # [52] = stats -> 11 values {outbreak, inflvl, supplies,
-        #                            inf0, inf1, inf2, inf3,
-        #                            healing0, healing1, healing2, healing3}
-        # [53] = player_pos
-        ##########################################################
-        for c in self.city:
-            line = [c.get('i0'), c.get('i1'), c.get('i2'), c.get('i3'), c.get('center')]
-            data.append(line)
-
-        for p in range(0, 4):
-            data.append(self.player_cards[p])
-
-        line = [self.outbreak, self.inflvl, len(self.cardpile_player)]
-        for i in self.infection:
-            line.append(i)
-        for h in self.healing:
-            line.append(h)
-        data.append(line)
-
-        data.append(self.player_pos)
-        # print(data)
-        return data
-
     def set_player_role(self):
         role = random.randint(0, 7)
         check = True
@@ -223,28 +182,52 @@ class Server(Thread):
         conn.setblocking(False)
         message = libserver.Message(self.sel, conn, addr)
         self.sel.register(conn, selectors.EVENT_READ, data=message)
+
+    def version(self, *args):
+
+        last = dict(self.server_subversion.get(self.server_version))
+
+        self.server_version += 1
+
+        # {'city': 0, 'cards': 0, 'stats': 0, 'player': 0}
+
+        for sub in args:
+            last[sub] += 1
+
+        self.server_subversion[self.server_version] = last
+
+        # cleanup
+        maxhistory = 10
+        # TODO set maxhistory
+        if self.server_version > maxhistory:
+            for cleanup in range(0, self.server_version - maxhistory):
+                if cleanup in self.server_subversion:
+                    del self.server_subversion[cleanup]
     # endregion
 
     # region SERVER GAME CLIENT ########################################################################################
     def actions(self, argument):
+        # print(self.server_subversion)
         self.request = argument
-        switcher = {
-            "getVersion":       self.get_version,       # Init Game
-            "player_signin":    self.set_player,        # Init Game
-            "get_init_update":  self.get_init_update,   # update Game-Preparation-Data to client
-            "player_rdy":       self.player_is_rdy,     # Init Game
-            "recon":            self.recon_player,      # reconnect Player
-            "get_update":       self.get_update,        # Main Game
-            "player_move":      self.player_move,       # Main Game
-            "draw_playercard":  self.deal_player,       # Main Game
-            "draw_infcard":     self.deal_infection,
-            "draw_epidemiecard":self.deal_epidemie,
-            "center":           self.modify_center,
-            "heal":             self.healdisease,
 
-            "update_cards":     self.update_cards,
-            "update_inf":       self.update_infection,
-            "turn_over":        self.set_next_player,
+        switcher = {
+            "getVersion":           self.get_version,               # Init Game
+            "player_signin":        self.set_player,                # Init Game
+            "get_init_update":      self.get_init_update,           # update Game-Preparation-Data to client
+            "player_rdy":           self.player_is_rdy,             # Init Game
+            "recon":                self.recon_player,              # reconnect Player
+            "get_update":           self.get_update,                # Main Game
+            "player_move":          self.player_move,               # Main Game
+            "draw_playercard":      self.deal_cards_player,         # Main Game
+            "draw_infcard":         self.deal_card_infection,
+            "draw_epidemiecard":    self.deal_card_epidemie,
+            "center":               self.update_center,
+            "heal":                 self.healdisease,
+            "card_exchange":        self.deal_card_exchange,
+            "update_cards":         self.update_cards,
+            "update_inf":           self.update_infection,
+            "turn_over":            self.set_next_player,
+            "error":                self.print_error
 
         }
         # Get the function from switcher dictionary
@@ -259,13 +242,19 @@ class Server(Thread):
 
     # global ----------------------------------------------------------------------------------------------------------#
     def get_version(self):
-        content = {"v": self.serverversion, "p": self.current_player}
+        content = {"v": self.server_version}
         return content
 
-    # INIT ------------------------------------------------------------------------------------------------------------#
+    def print_error(self):
+        print("ERROR ------", str(self.request.get("value").get('e')))
+        self.error_message = self.request.get("value").get('e')
+
+        return self.get_update()
+
+    # region ------ INIT ----------------------------------------------------------------------------------------------#
     def get_init_update(self):
-        content = {"response":      "init_update",
-                   "v":             self.serverversion,
+        content = {"R":             "init_update",
+                   "v":             self.server_version,
                    "player":        self.player_name,
                    "player_role":   self.player_role,
                    "player_rdy":    self.player_rdy,
@@ -274,24 +263,31 @@ class Server(Thread):
         return content
 
     def set_player(self):
-        self.serverversion += 1
+        self.version('player')
 
-        newname = self.request.get("value")
+        newname = self.request.get("value").get('player_name')
 
         n = 0
         while n < len(self.player_name):
-            print(str(n) + " " + self.player_name[n])
+            # print(str(n) + " " + self.player_name[n])
             if self.player_name[n] != "":
                 n = n + 1
             else:
                 break
         if n < len(self.player_name):
             self.player_name[n] = newname
-            self.player_role[n] = self.set_player_role()
 
-        content = {"response": "player_set",
-                   "v": self.serverversion,
-                   "player_num": n,
+            # TODO REMOVE
+            if newname == "log":
+                self.player_role[n] = 5
+            else:
+                self.player_role[n] = 2
+            # TODO REMOVE
+            # self.player_role[n] = self.set_player_role()
+
+        content = {"R":             "player_set",
+                   "v":             self.server_version,
+                   "player_num":    n,
                    "player":        self.player_name,
                    "player_role":   self.player_role,
                    "player_rdy":    self.player_rdy,
@@ -299,7 +295,9 @@ class Server(Thread):
         return content
 
     def set_next_player(self):
-        self.serverversion += 1
+        self.version('player')
+
+        playernum = self.request.get("value").get('player_num')
 
         n = 0
         while n < len(self.player_name):
@@ -307,22 +305,19 @@ class Server(Thread):
                 n = n + 1
             else:
                 break
-        self.current_player = (self.request.get("value") + 1) % n
+        self.current_player = (playernum + 1) % n
 
-        content = {"response": "next_player",
-                   "v": self.serverversion,
-                   "cur_player": self.current_player,
-                   }
         return self.get_update()
 
     def player_is_rdy(self):
-        p = self.request.get("value")
+        self.version('player')
+        p = self.request.get("value").get("player_num")
         print("Player " + str(p) + " is ready")
         self.player_rdy[p] = 1
         return self.get_init_update()
 
     def recon_player(self):
-        content = {"response": "recon",
+        content = {"R": "recon",
                    "player": self.player_name,
                    "player_role": self.player_role,
                    "state": self.game_STATE
@@ -345,7 +340,7 @@ class Server(Thread):
                 self.carddisposal_infection.append(city)
                 del self.cardpile_infection[0]
 
-                inf = self.city[city].get('farbe')
+                inf = self.city[city].get('d')
                 self.infection[inf] -= x + 1
 
                 self.city[city]['i'+str(inf)] = x + 1
@@ -406,42 +401,82 @@ class Server(Thread):
                 self.cardpile_player.append(piles[c])
 
         self.game_STATE = "GAME"
-        self.serverversion += 1
+        self.version('player', 'city', 'stats', 'cards')
         print("START GAME")
+    # endregion
 
-    # MAINGAME --------------------------------------------------------------------------------------------------------#
+    # region ------ MAINGAME ------------------------------------------------------------------------------------------#
     def get_update(self):
-        # todo update only relevant parts
 
-        content = {"response":  "update",
-                   "v":          self.serverversion,
-                   "cur_player": self.current_player,
-                   "data":       self.data2send(),
-                   }
+        last_version = self.request.get('value').get('v')
+        select_update = {'city': False, 'cards': False, 'stats': False, 'player': False}
+
+        if last_version in self.server_subversion:
+            # update only new values
+            last_subversion = self.server_subversion[last_version]
+            for element in self.server_subversion[self.server_version]:
+                if self.server_subversion[self.server_version][element] != last_subversion[element]:
+                    select_update[element] = True
+        else:
+            for element in select_update:
+                select_update[element] = True
+
+        content = {"R": "update",
+                   "v": self.server_version}
+
+        # todo update only relevant parts
+        # TODO append single citys
+        if select_update['city']:
+            city = []
+            for c in self.city:
+                line = [c.get('i0'), c.get('i1'), c.get('i2'), c.get('i3'), c.get('center')]
+                city.append(line)
+            content['city'] = city
+
+        if select_update['cards']:
+            content['cards'] = self.player_cards, self.card_exchange
+
+        if select_update['stats']:
+            stats = [self.outbreak, self.inflvl, len(self.cardpile_player)]
+            for i in self.infection:
+                stats.append(i)
+            for h in self.healing:
+                stats.append(h)
+            content['stats'] = stats
+
+        if select_update['player']:
+            content['player'] = self.player_pos, self.current_player
+
+        if self.game_STATE != "GAME":  # win or lose
+            content['state'] = self.game_STATE
+
         return content
 
     def player_move(self):
-        self.serverversion += 1
+
         movep = self.request.get("value")
         # 'player': self.this_player_num,
         # 'moveto': self.this_player_turns['target'],
         # 'usedcards': []
 
-        self.player_pos[movep['player']] = movep['moveto']
+        self.player_pos[movep['moveplayer']] = movep['moveto']
+        self.version('player')
+
         for card in movep['usedcards']:
             self.carddisposal_player.append(card)
             self.player_cards[movep['player']].remove(card)
+            self.version('cards')
 
         return self.get_update()
 
-    def deal_player(self):
-        self.serverversion += 1
+    def deal_cards_player(self):
         # val = self.request.get("value")
         if len(self.cardpile_player) > 1:       # check pile
+            self.version('cards')
             new_card = self.cardpile_player[0], self.cardpile_player[1]  # draw card
             del self.cardpile_player[0]         # remove card from pile
             del self.cardpile_player[0]         # remove card from pile
-            content = {"response": "new_cards",
+            content = {"R": "new_cards",
                        "new_cards": new_card
                        }
             return content
@@ -449,31 +484,62 @@ class Server(Thread):
             self.game_STATE = "LOSE_GAME"
             return self.get_update()
 
-    def deal_infection(self):
-        self.serverversion += 1
+    def deal_card_exchange(self):
+
+        val = self.request.get("value")
+
+        print("EXCHANGE")
+        print(str(val))
+
+        if val['status'] == "request":
+            self.card_exchange = val
+
+        if val['status'] == "response":
+            print("EXCHANGE", "response")
+            # reset request
+            self.card_exchange = {'status': None, 'sender': None, 'card': None, 'receiver': None}
+            if len(val['decline']) == 0:  # execute only when decline = 0
+                print("EXCHANGE", 2)
+                for c in val.get('burn'):
+                    self.player_cards[val['exchange']['receiver']].remove(c)
+                    self.carddisposal_player.append(c)
+
+                self.player_cards[val['exchange']['receiver']].append(val['exchange']['card'])
+                self.player_cards[val['exchange']['sender']].remove(val['exchange']['card'])
+
+        self.version('cards')
+
+        return self.get_update()
+
+    def deal_card_infection(self):
+
         new_card = []
         num = self.newinfection[self.inflvl] if self.inflvl < 6 else 4
 
         for c in range(0, num):
             new_card.append(self.cardpile_infection[0])
-            # self.carddisposal_infection.append(self.cardpile_infection[0])
             del self.cardpile_infection[0]
-        content = {"response": "new_cards",
+            self.version('cards')
+
+        content = {"R": "new_cards",
                    "new_inf": new_card
                    }
+
         return content
 
-    def deal_epidemie(self):
-        self.serverversion += 1
+    def deal_card_epidemie(self):
+
         # increase infection lvl
         self.inflvl += 1
+        self.version('stats')
 
         # draw lowest card
         new_card = [self.cardpile_infection[len(self.cardpile_infection) - 1]]
         self.carddisposal_infection.append(self.cardpile_infection[len(self.cardpile_infection) - 1])
         del self.cardpile_infection[len(self.cardpile_infection) - 1]
+        self.version('cards')
 
-        content = {"response": "new_cards",
+        content = {"R": "new_cards",
                    "new_epi": new_card
                    }
         return content
@@ -484,7 +550,7 @@ class Server(Thread):
         # karten mischen und zurücklegen
 
     def update_cards(self):
-        self.serverversion += 1
+        self.version('cards')
         update = self.request.get("value")
 
         for c in update.get('remove'):
@@ -506,30 +572,41 @@ class Server(Thread):
         return self.get_version()
 
     def healdisease(self):
-        self.serverversion += 1
 
         value = self.request.get("value")
-        disease = self.city[value.get('cards')[0]].get('farbe')
+        disease = self.city[value.get('cards')[0]].get('d')
 
         self.healing[disease] = 1
+        self.version('stats')
         for c in value.get('cards'):
             self.player_cards[value.get('player')].remove(c)
             self.carddisposal_player.append(c)
+            self.version('cards')
 
         return self.get_version()
 
     def update_infection(self):
-        self.serverversion += 1
+
+        def check_specialist(pos):
+            if 2 in self.player_role:
+                specialist = self.player_role.index(2)
+                nearby = [pos]
+                for con in self.city[pos].get('con'):
+                    nearby.append(con)
+
+                if self.player_pos[specialist] in nearby:
+                    return True
+
+            return False
+
         value = self.request.get("value")
 
         # ------ new infection --------------------------------------------------------------------------------------- #
         if "card" in value:
             card = value.get("card")
-            color = self.city[card]['farbe']
+            color = self.city[card]['d']
 
             epidemie = 1 if 'epidemie' in value else 0
-
-            print("UPDATE_INFECTION", str(value), str(epidemie))
 
             # if epidemie shuffle infection cards
             self.carddisposal_infection.append(card)
@@ -542,33 +619,34 @@ class Server(Thread):
                 self.carddisposal_infection = []
 
             if self.healing[color] != 2:  # check if extinct
-                infected = []
-                inf = [card]
-                # when epidemie = 1 add 3 otherwise add 1
-                while len(inf) > 0:
-                    if inf[0] not in infected:
-                        if self.city[inf[0]]['i' + str(color)] < 3 - (2 * epidemie):
-                            self.city[inf[0]]['i' + str(color)] += (1 + 2 * epidemie)
-                            if self.infection[color] > 0 + (2 * epidemie):
-                                self.infection[color] -= (1 + 2 * epidemie)
-                            else:
-                                # -> YOU LOSE -----------------------------------------------
-                                self.game_STATE = "LOSE_GAME"
-                                print("LOSE_GAME infection")
-                        else:  # outbreak
-                            self.outbreak += 1
-                            if self.outbreak >= 8:
-                                # -> YOU LOSE -----------------------------------------------
-                                self.game_STATE = "LOSE_GAME"
-                                print("LOSE_GAME outbreak")
-                            for o in self.city[inf[0]].get("con"):
-                                if o not in infected and o not in inf:
-                                    inf.append(o)
 
-                        print(str(inf))
-                        infected.append(inf[0])
-                        epidemie = 0  # use epidemie only in first round
-                    del inf[0]
+                if not check_specialist(card):
+                    infected = []
+                    inf = [card]
+                    # when epidemie = 1 add 3 otherwise add 1
+                    while len(inf) > 0:
+                        if inf[0] not in infected:
+                            if self.city[inf[0]]['i' + str(color)] < 3 - (2 * epidemie):
+                                self.city[inf[0]]['i' + str(color)] += (1 + 2 * epidemie)
+                                if self.infection[color] > 0 + (2 * epidemie):
+                                    self.infection[color] -= (1 + 2 * epidemie)
+                                else:
+                                    # -> YOU LOSE -----------------------------------------------
+                                    self.game_STATE = "LOSE_GAME"
+                                    print("LOSE_GAME infection")
+                            else:  # outbreak
+                                self.outbreak += 1
+                                if self.outbreak >= 8:
+                                    # -> YOU LOSE -----------------------------------------------
+                                    self.game_STATE = "LOSE_GAME"
+                                    print("LOSE_GAME outbreak")
+                                for o in self.city[inf[0]].get("con"):
+                                    if o not in infected and o not in inf and not check_specialist(o):
+                                        inf.append(o)
+
+                            infected.append(inf[0])
+                            epidemie = 0  # use epidemie only in first round
+                        del inf[0]
         # ------ remove infection ------------------------------------------------------------------------------------ #
         else:
             player = value.get('player')
@@ -585,10 +663,12 @@ class Server(Thread):
                 if self.infection[disease] > 23:
                     self.healing[disease] = 2  # extinct
 
+        self.version('city', 'stats')
+
         return self.get_update()
 
-    def modify_center(self):
-        self.serverversion += 1
+    def update_center(self):
+
         update = self.request.get("value")
         # 'player': self.this_player_num,
         # 'center_new': pos,
@@ -599,6 +679,9 @@ class Server(Thread):
             self.city[update.get('center_removed')]['center'] = 0
         if self.player_role[update.get('player')] != 7:
             self.player_cards[update.get('player')].remove(update.get('center_new'))
+            self.version('cards')
+
+        self.version('city')
 
         return self.get_version()
     # endregion
@@ -619,10 +702,11 @@ class Server(Thread):
                                 req = message.get_request()
                                 if req.get("action"):
                                     message.set_response(self.actions(req))
-                        except Exception:
+                        except Exception as e:
                             print(
                                 "main: error: exception for",
                                 f"{message.addr}:\n{traceback.format_exc()}",
+                                e
                             )
                             message.close()
         except KeyboardInterrupt:
@@ -638,10 +722,12 @@ class ServerInterface(tk.Tk):
         self.player = ["", "", "", ""]
         self.player_rdy = [0, 0, 0, 0]
 
+        self.errormsg = ""
+
         tk.Tk.__init__(self)
 
         self.title("Pandemie | Server")
-        self.geometry("150x320+600+1")
+        self.geometry("150x400+600+1")
 
         self.lblstatus = Label(self, text="Status", font="Helvetica 12")
         self.lblstatus.pack(fill=X, pady=10)
@@ -678,6 +764,14 @@ class ServerInterface(tk.Tk):
         self.btn_helper = Button(self, text='helper', command=self.btn_helper)
         self.btn_helper.pack(fill=X, pady=5, padx=10)
 
+        seph = ttk.Separator(self, orient=HORIZONTAL)
+        seph.pack(fill=X, pady=10, padx=5)
+
+        self.lblerror = Label(self, text="State", font="Helvetica 10", anchor='w')
+        self.lblerror.pack(fill=X, pady=0, padx=5)
+        self.lblerrormsg = Label(self, text="-", font="Helvetica 10", anchor='w')
+        self.lblerrormsg.pack(fill=X, pady=0, padx=10)
+
         self.myserver = Server()
         self.gui_loop()
 
@@ -693,6 +787,8 @@ class ServerInterface(tk.Tk):
 
         self.player = self.myserver.player_name
         self.player_rdy = self.myserver.player_rdy
+
+        self.errormsg = self.myserver.error_message
 
         if self.player[0] != "":
             self.lbl_plr_0.configure(text=self.player[0])
@@ -714,6 +810,10 @@ class ServerInterface(tk.Tk):
         if self.player_rdy[3]:
             self.lbl_plr_2.configure(bg="SeaGreen1")
 
+        if self.errormsg != "":
+            self.lblerrormsg.configure(fg="#990000", font='Helvetica 10 bold', text=self.errormsg)
+        else:
+            self.lblerrormsg.configure(fg="#000000", font='Helvetica 10', text="no error")
         self.after(1000, self.gui_loop)
 
 
@@ -773,7 +873,7 @@ class GameStats(tk.Tk):
         self.master.destroy()
 
     def helper_loop(self):
-        serverversion = self.server.serverversion
+        serverversion = self.server.server_version
         state = self.server.game_STATE              # "INIT"
         player_name = self.server.player_name       # ["", "", "", ""]
         player_role = self.server.player_role       # [0, 0, 0, 0]
