@@ -75,14 +75,16 @@ class Server(Thread):
         self.player_cards = [[], [], [], []]
         self.player_pos = [0, 0, 0, 0]
 
-        self.card_exchange = {'status': None, 'sender': None, 'card': None, 'receiver': None}
-        self.role3extra = 0
+        self.card_exchange = {'status': "", 's': 9, 'c': 99, 'r': 9, 'b': 99, 'd': 0}
+        self.special_val = {'r3': 0, 'a50': []}
 
         # stats
         self.infection = [24, 24, 24, 24]
         self.outbreak = 0
         self.inflvl = 0
         self.healing = [0, 0, 0, 0]         # 0 = active,  1 = healed,  2 = exterminated
+
+        self.visual = {}
 
         # working var
         self.newinfection = [2, 2, 2, 3, 3, 4]
@@ -175,8 +177,6 @@ class Server(Thread):
             {'ID': 47, 'd': 3, 'i': [0, 0, 0, 0], 'c': 0, 'pop':  3785, 'con': [46, 44, 12],             'name': 'Sydney'}]
         # endregion
 
-        # self.start()
-
     # region functions #################################################################################################
     def set_player_role(self):
         role = random.randint(0, 7)
@@ -201,7 +201,7 @@ class Server(Thread):
         switcher = {
             'player_cards':     ('CP', self.player_cards),
             'card_exchange':    ('CE', self.card_exchange),
-            'role3extra':       ('C3', self.role3extra),
+            'special_val':      ('C3', self.special_val),
             'outbreak':         ('SO', self.outbreak),
             'inflvl':           ('SL', self.inflvl),
             'supply':           ('SS', len(self.cardpile_player)),
@@ -212,7 +212,8 @@ class Server(Thread):
             'player_name':      ('PN', self.player_name),
             'player_role':      ('PR', self.player_role),
             'player_rdy':       ('PS', self.player_rdy),
-            'STATE':            ('S', {'s': self.game_STATE, 'r': self.reason})
+            'STATE':            ('S', {'s': self.game_STATE, 'r': self.reason}),
+            'VI':               ('VI', self.visual)
         }
 
         if key == 'city':
@@ -238,8 +239,6 @@ class Server(Thread):
 
     def get_update(self):
         old = self.request.get('value').get('v')
-        print(">>>", old)
-        print(">>>", self.server_history)
         newupdate = {"R": "update",
                      "v": self.server_version}
 
@@ -254,10 +253,9 @@ class Server(Thread):
 
             return newupdate
         else:  # complete update
-
             newupdate['CP'] = self.player_cards
             newupdate['CE'] = self.card_exchange
-            newupdate['C3'] = self.role3extra
+            newupdate['C3'] = self.special_val
             newupdate['SO'] = self.outbreak
             newupdate['SL'] = self.inflvl
             newupdate['SS'] = len(self.cardpile_player)
@@ -476,6 +474,10 @@ class Server(Thread):
         # 'moveto': self.this_player_turns['target'],
         # 'usedcards': []
 
+        # player, from, to
+        self.visual = {'move': [movep['player'], self.player_pos[movep['moveplayer']], movep['moveto']]}
+        self.version("VI")
+
         self.player_pos[movep['moveplayer']] = movep['moveto']
         if 'steps' in movep:
             self.turnsleft(-movep['steps'])
@@ -486,15 +488,14 @@ class Server(Thread):
                 self.player_cards[movep['player']].remove(card)
                 self.carddisposal_player.append(card)
                 self.version("player_cards")
-            else:
-                self.role3extra = 0
+            else:  # Freiflug
+                self.special_val['r3'] = 0
                 self.version("player_cards")
-                self.version("role3extra")
+                self.version("special_val")
 
         if self.player_role[movep['moveplayer']] == 6:  # Sanitäter
             for disease in range(0, 4):
                 if self.healing[disease] == 1:  # disease is healed
-
                     check_city = [movep['moveto']]
                     if "path" in movep:
                         for c in movep['path']:
@@ -505,10 +506,9 @@ class Server(Thread):
                         self.version("infection")
                         self.city[c]['i'][disease] = 0
                         self.version("city", c)
-                    # infection only extincts when invention is played
-                    # if self.infection[disease] > 23:
-                    #     self.healing[disease] = 2  # extinct
-                    #     self.version("healing")
+                    if self.infection[disease] > 23:
+                        self.healing[disease] = 2  # extinct
+                        self.version("healing")
 
         return self.get_update()
 
@@ -545,9 +545,9 @@ class Server(Thread):
             return content
         elif val['turn'] == "getcard":
             self.carddisposal_player.remove(val['card'])
-            self.role3extra = val['card']
+            self.special_val['r3'] = val['card']
             self.turnsleft(-1)
-            self.version("role3extra")
+            self.version("special_val")
             return self.get_update()
 
     def manage_actioncard(self):
@@ -576,9 +576,9 @@ class Server(Thread):
                     self.version("player_cards")
                     self.carddisposal_player.append(48)
                 else:
-                    self.role3extra = 0
+                    self.special_val['r3'] = 0
                     self.version("player_cards")
-                    self.version("role3extra")
+                    self.version("special_val")
                 print(self.player_cards[val['player']])
                 return self.get_version()
             else:  # cancel
@@ -591,16 +591,18 @@ class Server(Thread):
                            "action50": self.carddisposal_infection
                            }
                 return content
-            else:
+            else:  # exec
                 self.carddisposal_infection.remove(val['city'])
+                self.special_val['a50'].append(val['city'])
+                self.version("special_val")
                 if 50 in self.player_cards[val['player']]:
                     self.player_cards[val['player']].remove(50)
                     self.version("player_cards")
                     self.carddisposal_player.append(50)
                 else:
-                    self.role3extra = 0
+                    self.special_val['r3'] = 0
                     self.version("player_cards")
-                    self.version("role3extra")
+                    self.version("special_val")
                 return self.get_version()
         if val['ac'] == 51:
             self.city[val['city']]['c'] = 1
@@ -613,9 +615,9 @@ class Server(Thread):
                 self.version("player_cards")
                 self.carddisposal_player.append(51)
             else:
-                self.role3extra = 0
+                self.special_val['r3'] = 0
                 self.version("player_cards")
-                self.version("role3extra")
+                self.version("special_val")
             return self.get_version()
         if val['ac'] == 52:
             if 52 in self.player_cards[val['player']]:
@@ -623,9 +625,9 @@ class Server(Thread):
                 self.version("player_cards")
                 self.carddisposal_player.append(52)
             else:
-                self.role3extra = 0
+                self.special_val['r3'] = 0
                 self.version("player_cards")
-                self.version("role3extra")
+                self.version("special_val")
             self.skipinfection = True
             return self.get_version()
 
@@ -648,21 +650,26 @@ class Server(Thread):
 
     def deal_card_exchange(self):
 
-        val = self.request.get("value")
+        val = self.request.get("value")['exchange']
 
         if val['status'] == "request":
+            # if status = request:
+            # update CE, everything else is handled by client
             self.card_exchange = val
 
         if val['status'] == "execute":
             # reset request
-            self.card_exchange = {'status': None, 'sender': None, 'card': None, 'receiver': None}
-            if len(val['decline']) == 0:  # execute only when decline = 0
-                for c in val.get('burn'):
-                    self.player_cards[val['exchange']['receiver']].remove(c)
-                    self.carddisposal_player.append(c)
+            # self.card_exchange = {'status': "", 's': 9, 'c': 99, 'r': 9, 'b': 99, 'd': 0}
+            self.card_exchange['status'] = "done"
+            if val['d'] != 1:  # execute only when decline = 0
+                # remove card from sender
+                self.player_cards[val['s']].remove(val['c'])
+                # remove burn card from receiver
+                if val['b'] in self.player_cards[val['r']]:
+                    self.player_cards[val['r']].remove(val['b'])
+                # add card to receiver
+                self.player_cards[val['r']].append(val['c'])
 
-                self.player_cards[val['exchange']['receiver']].append(val['exchange']['card'])
-                self.player_cards[val['exchange']['sender']].remove(val['exchange']['card'])
                 self.version("player_cards")
                 self.turnsleft(-1)
 
@@ -1083,7 +1090,7 @@ class GameStats(tk.Tk):
         stat_healing = self.server.healing          # [0, 1, 0, 2]  # 0 = active,  1 = healed,  2 = exterminated
 
         stat_exchange = self.server.card_exchange
-        stat_role3 = self.server.role3extra
+        stat_role3 = self.server.special_val
 
         cardpile_player = self.server.cardpile_player                   # []
         cardpile_infection = self.server.cardpile_infection             # []
@@ -1097,7 +1104,7 @@ class GameStats(tk.Tk):
                                         ", inflvl: " + str(stat_inflvl) +
                                         ", Healing: " + str(stat_healing)) +
                                         "\n EXCHANGE: " + str(stat_exchange) +
-                                        ", role3extra " + str(stat_role3))
+                                        ", special_val " + str(stat_role3))
         for c, p in enumerate(self.lbl_player):
             p.configure(text=("Player " + str(c) + "\n" + player_name[c] +
                               "\n role: " + str(player_role[c]) +
