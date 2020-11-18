@@ -18,41 +18,45 @@ from Pandemie import libclient
 
 # BUGS
 ###########################################
+# TODO exec befehle server überarbeiten
+# TODO connect nur bei fail
+# TODO überarbeite ini
 # critical/function
-# TODO - inf 2x gleiche Stadt ?
+# TODO karte tauschen wenn dabei karte ersetzt wird hat spieler 8 karten
+# TODO bewege anderen spieler fehlerhaft
+# TODO zieh zweite karte bei epidemie (e=1. karte) erst nach mischen
+# TODO re-enter karten nachziehen immer aktiv
+# TODO logistiker bewegt andere evtl buggy
+
+# appearance
+# TODO aktion: klick card nicht button (incl confirm)
+# TODO indikator Ruhige nacht
+# TODO redesign Spielvorbereitung-window
+# TODO redesign (use?) verbindungs-window
+# TODO game lose begründung anders (besser) darstellen
+
+# unknown error
+#  ? inf 2x gleiche Stadt
+#  ? aktionskartenstart zeigt manchmal overlay zum kaertenziehen
+# ? zähe bevölkerung abbruch?/handling nicht stabil
 
 # whishlist
-# TODO zähe bevölkerung abbruch?/handling nicht stabil
-# TODO 'karte nicht geben' nicht über städten anzeigen
-# TODO infos über Züge anzeigen (sidebar, log)
-# TODO sometimes player behind infection
 # TODO block Cardpile turn 8/48
 # TODO action 14 + 15 for player role 5: other player must agree movement
 
-# appearance
-# TODO andere züge zeigen - hübscher zB Flugzeug
-# TODO redesign Spielvorbereitung-window
-# TODO game lose begründung anders (besser) darstellen
-
 # system
-# TODO  do not check toolbar
 # TODO reduce tooltips
-# TODO remove game_init_update
-# TODO remove initupdate
+# TODO remove initupdate / game_init_update
 # TODO raise elements in draw only if nessecary
 # TODO program toolbar cleaner ,-)
 
 ########################################################################################################################
 update_intervall = 3000
-port = 9999
-php_path = "http://moja.de/public/python/getip.php"
+php_path = "http://moja.de/public/python/"
 # -------------------------------------------------------------------------------------------------------------------- #
 res = zipfile.ZipFile(str(Path(__file__).parent) + "/res/data.zip", 'r')  # TODO remove zip
-
-trans = '@' + str(Path(__file__).parent) + '/res/tran'
-full = '@' + str(Path(__file__).parent) + '/res/full'
 # -------------------------------------------------------------------------------------------------------------------- #
-AM_DEBUG = True # TODO False
+AM_DEBUG = True  # TODO False
 AM_LOG = True
 ########################################################################################################################
 
@@ -248,7 +252,7 @@ class Client(tk.Tk):
         # a50:  city from 'zähe bevölkerung'
 
         self.visual = {}
-        self.logtextcontent = ["", "", "", "", "", "", "", ""]
+        self.logtext = ""
 
         # request
         self.host = ''
@@ -264,6 +268,7 @@ class Client(tk.Tk):
         self.ctrl_res_load = [0, 188, 0]  # [act load, total load, ready]
         self.ip_am = '127.0.0.1'
         self.ip_parts = self.ip_am.split(".")
+        self.port = 9999
 
         # gamestats
         self.game_STATE = "INIT"  # region ###### info ######
@@ -381,8 +386,6 @@ class Client(tk.Tk):
         self.img_c_over = []
         self.img_c2_back_raw = Image  # infectioncard, back
         self.img_c2_back = ImageTk
-        self.img_c2_raw = Image  # infectioncard, back
-        self.img_c2 = ImageTk
         self.img_inf_raw = []  # infection marker: inf_0_1.png
         self.img_inf = []
         self.img_center_raw = Image  # center
@@ -395,6 +398,8 @@ class Client(tk.Tk):
         self.img_win = ImageTk
         self.img_lose_raw = Image
         self.img_lose = ImageTk
+        self.img_flug_raw = ImageTk
+        self.img_flug = ImageTk
 
         self.img_splash_raw = Image
         self.img_splash = ImageTk
@@ -402,6 +407,7 @@ class Client(tk.Tk):
         self.transparent_color = '#abcdef'
 
         self.img_quicktip_bg = ImageTk
+        self.img_sel48bg = ImageTk
 
         # endregion
 
@@ -469,6 +475,7 @@ class Client(tk.Tk):
 
         self.i_quicktip = self.game_canvas.create_text(0, 0)
         self.i_status = self.game_canvas.create_text(0, 0)
+        self.i_logtext = self.game_canvas.create_text(0, 0)
 
         self.txt_status = ["", ""]
         # endregion
@@ -486,7 +493,7 @@ class Client(tk.Tk):
             self.drawcards = []
             self.range = []
             self.turns = {'sender': "", 'turn': 0, 'secondcity': False, 'LEFT': 0}
-            self.xchng = {'status': "", 's': 9, 'c': 99, 'r': 9, 'b': 99, 'd': 0}  # TODO check status
+            self.xchng = {'status': "", 's': 9, 'c': 99, 'r': 9, 'b': 99, 'd': 0}
             self.exchange = self.xchng
 
         def set_exchange(self, entry, value):
@@ -548,8 +555,9 @@ class Client(tk.Tk):
             self.config(cursor="wait")
             # connection
             # try to get ip for server from php-script
-            self.ip_am = urllib.request.urlopen(php_path).read().decode('utf8').strip()
+            self.ip_am = urllib.request.urlopen(php_path+'getip.php').read().decode('utf8').strip()
             self.ip_parts = self.ip_am.split(".")
+            self.port = int(urllib.request.urlopen(php_path+'getport.php').read().decode('utf8'))
 
             self.ctrl_res_load[2] = 1
 
@@ -573,6 +581,10 @@ class Client(tk.Tk):
             self.img_zaeh = ImageTk.PhotoImage(self.img_zaeh_raw)
             self.ctrl_res_load[0] += 1
 
+            self.img_flug_raw = Image.open(res.open("mat/flugzeug.png"))
+            self.img_flug = ImageTk.PhotoImage(self.img_flug_raw)
+            self.ctrl_res_load[0] += 1
+
             for c in range(0, 55):
                 self.img_c1_raw.append(Image.open(res.open("cards/c1_" + "{:02d}".format(c) + ".png")))
                 self.img_c1.append(ImageTk.PhotoImage(self.img_c1_raw[c]))
@@ -585,11 +597,6 @@ class Client(tk.Tk):
 
             self.img_c2_back_raw = Image.open(res.open("cards/c2_0.png"))
             self.img_c2_back = ImageTk.PhotoImage(self.img_c2_back_raw)
-            self.ctrl_res_load[0] += 1
-
-            # TODO remove
-            self.img_c2_raw = Image.open(res.open("cards/c2_overlay.png"))
-            self.img_c2 = ImageTk.PhotoImage(self.img_c2_raw)
             self.ctrl_res_load[0] += 1
 
             self.img_win_raw = Image.open(res.open("mat/win.png"))
@@ -734,7 +741,7 @@ class Client(tk.Tk):
 
     def window_02a_game_prep(self, *event):
         def btn_init_signin(*event):
-            _print("INIT", "BTN")
+            _print("Button")
             playername = self.entry_n.get()
             if playername != "":
                 self.entry_n.configure(state=DISABLED)
@@ -747,7 +754,7 @@ class Client(tk.Tk):
                 self.btn_start.bind('<Return>', btn_init_player_rdy)
 
         def btn_init_player_rdy(*event):
-            _print("INIT", "BTN")
+            _print("Button")
             self.btn_start.configure(bg="SeaGreen1", text="Warte auf andere Spieler", state=DISABLED)
             self.game_STATE = "WAIT"
             self.action = 'player_rdy'
@@ -757,7 +764,7 @@ class Client(tk.Tk):
 
         # global client_host
         self.host = self.entry1.get() + '.' + self.entry2.get() + '.' + self.entry3.get() + '.' + self.entry4.get()
-
+        # TODO xxxxxx PORT
         self.CONframe.destroy()
 
         self.title("Spielvorbereitung")
@@ -795,7 +802,7 @@ class Client(tk.Tk):
 
     def window_02b_recon(self, event=None):
         def btn_init_recon():
-            _print("INIT", "BTN")
+            _print("Button")
             try:
                 num = int(self.entry_re.get())
                 if 0 <= num < 4:
@@ -814,7 +821,7 @@ class Client(tk.Tk):
 
         # global client_host
         self.host = self.entry1.get() + '.' + self.entry2.get() + '.' + self.entry3.get() + '.' + self.entry4.get()
-        _print("INIT", "reconnect", self.host)
+        _print("INIT", "reconnect", self.host, self.port)
 
         self.CONframe.destroy()
 
@@ -885,7 +892,7 @@ class Client(tk.Tk):
             )
 
         request = create_request(self.action, self.value)
-        self.start_connection(self.host, port, request)
+        self.start_connection(self.host, self.port, request)
 
         try:
             while True:
@@ -1033,8 +1040,8 @@ class Client(tk.Tk):
                    "sender[" + str(self.TP.turns['sender']) + "]")
 
         # update game button
-        if self.TP.turns['turn'] == 15 and self.TP.turns['sender'] == "BTN":
-            self.draw_city_highlight()
+        if self.TP.turns['turn'] == 15 and self.TP.turns['sender'] == "BTN_":
+            # self.draw_city_highlight()
             self.localversion = 0
             self.reload = True
 
@@ -1094,7 +1101,7 @@ class Client(tk.Tk):
         # region ACTIONCARD ========================================================================================== #
         # ---  6 - select ACTIONCARD --------------------------------------------------------------------------------- #
         if self.TP.turns['turn'] == 6:
-            if self.TP.turns['sender'] == "BTN":
+            if self.TP.turns['sender'] == "BTN_":
                 self.txt_status[1] = "Keine Aktionskarte vorhanden."
                 self.TP.cs_reset()
                 for c in self.TP.cards:
@@ -1111,20 +1118,19 @@ class Client(tk.Tk):
                                              "G",
                                              "actioncard")
             if self.TP.turns['sender'] == "CARD":
-                self.TP.set_turns('sender', "BTN")  # set card as btn
+                self.TP.set_turns('sender', "BTN_")  # set card as btn
                 if self.TP.turns['card'] < 8:
                     self.TP.set_turns('turn', self.TP.cards[self.TP.turns['card']])
                 else:
                     self.TP.set_turns('turn', self.special_val['r3'])
         # --- 48 - ACTIONCARD - Prognose ----------------------------------------------------------------------------- #
         if self.TP.turns['turn'] == 48:
-            if self.TP.turns['sender'] == "BTN":  # initialize action
+            if self.TP.turns['sender'] == "BTN_":  # initialize action
                 self.value = {'v': self.localversion,
                               'ac': 48,
                               'turn': "request",
                               'player': self.TP.num}
                 self._update('actioncard')
-
             if self.TP.turns['sender'] == "response":
                 # tag 'BTN_48' to identify click
                 # tag 'popup' to delete all elements related temp display
@@ -1136,7 +1142,6 @@ class Client(tk.Tk):
                     self.draw_cards(firstsix, 48)
                 else:
                     self.txt_status[1] = "Keine Karten zu sortieren"
-
             if self.TP.turns['sender'] == "exec48":
                 for child in self.winfo_children():  # unbind all
                     child.unbind("<Enter>")
@@ -1156,6 +1161,7 @@ class Client(tk.Tk):
                     child.unbind("<Motion>")
                 self.game_canvas.delete("popup")
                 self.dismiss_tooltip()
+                self.TP.set_turns('turn', 0)
                 self.txt_status[1] = ""
                 self.value = {'v': self.localversion,
                               'ac': 48,
@@ -1165,7 +1171,7 @@ class Client(tk.Tk):
                 self._update('actioncard')
         # --- 49 - ACTIONCARD - Freiflug ----------------------------------------------------------------------------- #
         if self.TP.turns['turn'] == 49:
-            if self.TP.turns['sender'] == "BTN":  # initialize action
+            if self.TP.turns['sender'] == "BTN_":  # initialize action
                 self.draw_card_highlight(None)
                 self.dismiss_tooltip()
                 self.txt_status[1] = "Wähle Spieler aus."
@@ -1193,7 +1199,7 @@ class Client(tk.Tk):
                 self._update('player_move')
         # --- 50 - ACTIONCARD - zähe Bevölkerung -------------------------------------------------------------------- #
         if self.TP.turns['turn'] == 50:
-            if self.TP.turns['sender'] == "BTN":  # initialize action
+            if self.TP.turns['sender'] == "BTN_":  # initialize action
                 self.draw_card_highlight(None)
                 self.TP.cs_reset()
                 self.txt_status[1] = "Lade Städte..."
@@ -1219,7 +1225,7 @@ class Client(tk.Tk):
                 self._update('actioncard')
         # --- 51 - ACTIONCARD - staatliche Subvention ---------------------------------------------------------------- #
         if self.TP.turns['turn'] == 51:
-            if self.TP.turns['sender'] == "BTN":  # initialize action
+            if self.TP.turns['sender'] == "BTN_":  # initialize action
                 self.draw_card_highlight(None)
                 self.dismiss_tooltip()
                 self.txt_status[1] = "Wähle Stadt für Forschungszentrum aus."
@@ -1274,7 +1280,7 @@ class Client(tk.Tk):
                 self._update('actioncard')
         # --- 52 - ACTIONCARD - ruhige Nacht ------------------------------------------------------------------------- #
         if self.TP.turns['turn'] == 52:
-            if self.TP.turns['sender'] == "BTN":  # initialize action
+            if self.TP.turns['sender'] == "BTN_":  # initialize action
                 self.draw_card_highlight(None)
                 self.dismiss_tooltip()
                 self.txt_status[1] = "Die nächste Infektionsphase wird übersprungen."
@@ -1288,7 +1294,6 @@ class Client(tk.Tk):
         if self.TP.turns['turn'] == 500:
             # choose card to give or decline, this player is sender
             if self.TP.turns['sender'] == "CARD":
-                print(">>> X >>> 500 CARD", self.TP.exchange)
                 self.TP.exchange['c'] = self.TP.cards[self.TP.turns['card']]
 
                 self.TP.set_exchange('status', "execute")
@@ -1298,7 +1303,6 @@ class Client(tk.Tk):
                 self._update('card_exchange')
                 self.game_canvas.delete("popup")
             elif self.TP.turns['sender'] == "BTN_":
-                print(">>> X >>> 500 BTN_", self.TP.turns)
                 # decline request
                 self.TP.set_exchange('status', "execute")
                 self.TP.set_exchange('d', 1)
@@ -1307,16 +1311,13 @@ class Client(tk.Tk):
                 self._update('card_exchange')
                 self.game_canvas.delete("popup")
 
-                # TODO check
                 self.txt_status[1] = ""
-                #self.draw_card_highlight()
                 self.draw_card_highlight(None)
                 self.draw_city_highlight()
                 self.game_canvas.delete("popup")
         # -- 501 - exchange card - receive card ---------------------------------------------------------------------- #
         if self.TP.turns['turn'] == 501:
             if self.TP.turns['sender'] == "CARD":
-                print(">>> X >>> 501 CARD", self.TP.exchange)
                 playercard_decline = 0
 
                 if self.TP.turns['card'] < len(self.TP.cards):  # replace card
@@ -1333,7 +1334,6 @@ class Client(tk.Tk):
 
                 self._update('card_exchange')
 
-                # TODO check
                 self.txt_status[1] = ""
                 self.draw_card_highlight()
                 self.draw_card_highlight(None)
@@ -1385,7 +1385,7 @@ class Client(tk.Tk):
                                                   }
                                     self._update('center')
                                 else:  # move existing center
-                                    if self.TP.turns['sender'] == "BTN":  # highlight for movement
+                                    if self.TP.turns['sender'] == "BTN_":  # highlight for movement
                                         self.draw_city_highlight(center)
                                         self.txt_status[1] = "Wähle Center zum verschieben"
                                     if self.TP.turns['sender'] == "CITY":  # move center
@@ -1403,7 +1403,7 @@ class Client(tk.Tk):
                 # endregion
                 # region ---  3 - cure disease ----------------------------------------------------------------------- #
                 if self.TP.turns['turn'] == 3:
-                    if self.TP.turns['sender'] == "BTN":
+                    if self.TP.turns['sender'] == "BTN_":
                         check = 0
                         dis = None
                         for c in range(0, 4):
@@ -1440,7 +1440,7 @@ class Client(tk.Tk):
                     #    4. PALYER:
 
                     # build variable: self.TP.exchange:
-                    # {'status': "", 's': 9, 'c': 99, 'r': 9, 'b': 99, 'd': 0} TODO check
+                    # {'status': "", 's': 9, 'c': 99, 'r': 9, 'b': 99, 'd': 0}
                     # s: sender
                     # c: card
                     # r: receiver
@@ -1448,8 +1448,7 @@ class Client(tk.Tk):
                     # d: decline
 
                     # init exchange
-                    if self.TP.turns['sender'] == "BTN":
-                        print(">>> X >>> 4 BTN", self.TP.turns)
+                    if self.TP.turns['sender'] == "BTN_":
                         # reset exchange state
                         self.TP.cs_reset()
                         self.TP.reset_exchange()
@@ -1465,7 +1464,6 @@ class Client(tk.Tk):
                                 # select card, then receiver ..................................... -> player is sender
                             elif not self.check_exchange("send") and self.check_exchange("receive"):  # receive only
                                 self.TP.set_exchange('r', self.TP.num)
-                                print(">>> X >>> Wähle Platz für neue Karte aus.", self.TP.exchange)
                                 self.txt_status[1] = "Wähle Platz für neue Karte aus."
                                 self.draw_card_highlight(0, 0, "select_space")
                                 # select space, then sender, card can not be set ................. -> player is receiver
@@ -1495,7 +1493,6 @@ class Client(tk.Tk):
                             self.txt_status[1] = "Wissen teilen nicht möglich."
 
                     if self.TP.turns['sender'] == "choose":
-                        print(">>> X >>> 4 choose", self.TP.turns)
                         self.game_canvas.delete("choose")
                         if self.TP.turns['choose'] == 401:
                             # player is sender
@@ -1509,14 +1506,11 @@ class Client(tk.Tk):
                             self.draw_card_highlight(0, 0, "select_space")
 
                     if self.TP.turns['sender'] == "CARD":
-                        print(">>> X >>> 4 CARD", self.TP.turns)
                         # reset overlay
                         self.draw_card_highlight(None)
 
                         if self.TP.exchange['s'] == self.TP.num:
                             # player is sender, set card to send
-                            print(">>> X >>>", self.TP.turns['card'])
-                            print(">>> X >>>", self.TP.exchange)
                             self.TP.set_exchange('c', self.TP.cards[self.TP.turns['card']])
                             # draw selection
                             self.draw_player_selection(self.check_exchange("receiver"))
@@ -1530,7 +1524,6 @@ class Client(tk.Tk):
                             self.txt_status[1] = "Wähle Kartengeber aus."  # select sender ....... -> player is receiver
 
                     if self.TP.turns['sender'] == "PLAY":
-                        print(">>> X >>> 4 PLAY", self.TP.exchange)
                         # reset overlay
                         self.draw_player_selection()
 
@@ -1545,7 +1538,6 @@ class Client(tk.Tk):
                         # self.xchng = {'status': "", 'sender': 0, 'card': 0, 'receiver': 0}
                         self.txt_status[1] = "Warte auf anderen Spieler"
                         self.TP.set_exchange('status', "request")
-                        print(">>> X >>> Warte auf anderen Spieler", self.TP.exchange)
 
                         self.value = {'v': self.localversion,
                                       'exchange': self.TP.exchange}
@@ -1557,7 +1549,7 @@ class Client(tk.Tk):
                 # endregion
                 # region ---  5 - healing ---------------------------------------------------------------------------- #
                 if self.TP.turns['turn'] == 5:
-                    if self.TP.turns['sender'] == "BTN":
+                    if self.TP.turns['sender'] == "BTN_":
                         if self.city[self.TP.pos].get("c"):
                             self.TP.cs_reset()
                             check = [0, 0, 0, 0]
@@ -1613,7 +1605,7 @@ class Client(tk.Tk):
                 # endregion
                 # region ---  7 - krisenmanager only ----------------------------------------------------------------- #
                 if self.TP.turns['turn'] == 7:
-                    if self.TP.turns['sender'] == "BTN":
+                    if self.TP.turns['sender'] == "BTN_":
                         if self.special_val["r3"] == 0:
                             self.value = {'v': self.localversion,
                                           'turn': "request",
@@ -1623,6 +1615,7 @@ class Client(tk.Tk):
                             self.txt_status[1] = "Nur eine Karte möglich"
 
                     if self.TP.turns['sender'] == "response":
+                        print("> response", self.TP.turns['card'])
                         if len(self.TP.turns['card']) > 0:
                             self.TP.cs_reset()
                             self.txt_status[1] = "Wähle Karte aus"
@@ -1644,7 +1637,7 @@ class Client(tk.Tk):
                 # endregion
                 # region ---  8 - move ------------------------------------------------------------------------------- #
                 if self.TP.turns['turn'] == 8:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         self.get_player_path()
                         self.draw_city_highlight(self.TP.range)
                         self.txt_status[1] = "Bewegen: Wähle Ziel. (keine Karte notwendig)"
@@ -1668,7 +1661,7 @@ class Client(tk.Tk):
                 # endregion
                 # region ---  9 - fly direct ------------------------------------------------------------------------- #
                 if self.TP.turns['turn'] == 9:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         self.draw_city_highlight(self.TP.cards)
                         self.txt_status[1] = "Direktflug: Wähle Ziel. (eine Karte wird benötigt)"
                     if self.TP.turns['sender'] == "CITY":  # do action
@@ -1689,7 +1682,7 @@ class Client(tk.Tk):
                 # endregion
                 # region --- 10 - fly charter ------------------------------------------------------------------------ #
                 if self.TP.turns['turn'] == 10:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         pos = self.all_player_pos[self.logistician] if self.logistician < 3 else self.TP.pos
                         if pos in self.TP.cards:
                             self.txt_status[1] = "Charterflug: Wähle Zielstadt."
@@ -1717,7 +1710,7 @@ class Client(tk.Tk):
                 # endregion
                 # region --- 11 - fly special ------------------------------------------------------------------------ #
                 if self.TP.turns['turn'] == 11:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         pos = self.all_player_pos[self.logistician] if self.logistician < 3 else self.TP.pos
                         if self.city[pos]['c']:
                             self.txt_status[1] = "Sonderflug: Wähle Zielstadt mit Forschungscenter."
@@ -1748,7 +1741,7 @@ class Client(tk.Tk):
                 # endregion
                 # region --- 12 - LOGISTIKER - select player --------------------------------------------------------- #
                 if self.TP.turns['turn'] == 12:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         self.draw_city_highlight()
 
                         if self.logistician > 3:
@@ -1792,7 +1785,7 @@ class Client(tk.Tk):
                 # endregion
                 # region --- 17 - BETRIEBSEXPERTE - fly from center -------------------------------------------------- #
                 if self.TP.turns['turn'] == 17:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         if self.special_val['r7']:
                             if self.city[self.TP.pos]['c']:
                                 ccard = False
@@ -1834,7 +1827,7 @@ class Client(tk.Tk):
                 # endregion
                 # region --- 13 - LOGISTIKER - move player to player ------------------------------------------------- #
                 if self.TP.turns['turn'] == 13:
-                    if self.TP.turns['sender'] == "BTN":  # initialize action
+                    if self.TP.turns['sender'] == "BTN_":  # initialize action
                         self.draw_city_highlight()
                         selected_player = []
                         for num, name in enumerate(self.all_player_name):
@@ -1870,7 +1863,7 @@ class Client(tk.Tk):
                 # endregion
 
                 # --- 32 - end turn ---------------------------------------------------------------------------------- #
-                if self.TP.turns['turn'] == 16 and self.TP.turns['sender'] == "BTN":
+                if self.TP.turns['turn'] == 16 and self.TP.turns['sender'] == "BTN_":
                     self.TP.set_turns('turn', 0)
                     self.txt_status[1] = "Beende Zug"
                     # update server
@@ -1963,7 +1956,7 @@ class Client(tk.Tk):
                     self.txt_status[1] = ""
                     self._update('draw_playercard')
                 else:
-                    if self.TP.turns['sender'] == "BTN" \
+                    if self.TP.turns['sender'] == "BTN_" \
                             and self.TP.turns['turn'] == 16:
                         self.game_canvas.itemconfigure(self.i_quicktip, fill="")
                         self.game_canvas.delete("popup")
@@ -2053,10 +2046,14 @@ class Client(tk.Tk):
             if self.special_val['r3'] != args.get("C3")['r3']:
                 self.special_val['r3'] = args.get("C3")['r3']
                 self.gameupdatelist['cards'].append(9)
+                if self.special_val['r3'] == 0:
+                    self.game_canvas.delete("role3card")
             if self.special_val['a50'] != args.get("C3")['a50']:
                 self.special_val['a50'] = args.get("C3")['a50']
                 for num in self.special_val['a50']:
                     self.gameupdatelist['city'].append(num)
+            # TODO add a52
+            # TODO handle 'C3' with gameupdatelist
 
         # stats
         if 'SO' in args:
@@ -2071,7 +2068,6 @@ class Client(tk.Tk):
             if self.supplies != args['SS']:
                 self.supplies = args['SS']
                 self.gameupdatelist['sidebar'].append('SS')
-                # print("VISUAL, supply")
         if 'SI' in args:
             if self.infection != args['SI']:
                 self.infection = args['SI']
@@ -2104,6 +2100,11 @@ class Client(tk.Tk):
                 self.visual = args.get('VI')
                 self.gameupdatelist['visual'] = 1
 
+        if 'PR' in args:
+            if self.all_player_role != args.get('PR'):
+                self.all_player_role = args.get('PR')
+                self.TP.set_role(args.get('PR')[self.TP.num])
+
         # status
         if 'S' in args:
             if args['S']['s'] == "LOSE_GAME":
@@ -2114,7 +2115,6 @@ class Client(tk.Tk):
         # TODO check, remove or delete dublicate
         # newupdate['S'] = {'s': self.game_STATE, 'r': self.reason}
         # newupdate['PN'] = self.player_name
-        # newupdate['PR'] = self.player_role
         # newupdate['PS'] = self.player_rdy
 
         # update version
@@ -2128,16 +2128,22 @@ class Client(tk.Tk):
             oldimage = self.game_canvas.itemcget(card, "activeimage")
             self.game_canvas.itemconfig(card, activeimage=self.img_c_over[16])
             time.sleep(3)
-            self.game_canvas.itemconfig(card, activeimage=oldimage)
+            if self.running:
+                self.game_canvas.itemconfig(card, activeimage=oldimage)
 
+        print("CLICK: ", args)
+
+        # endregion
         if not self.block_request:
-            # region ###### CLICK @ CARDS ##############################################################################
-            if 8 < event.y < self.section_card_h:  # cardsection
-                card_num = math.floor(float(event.x) / (self.section_col1_w / 8))
-                _print("[" + str(self.TP.num) + "]",
-                       "CLICKED at Card: " + str(card_num))
+            sender = str(args[0][:4])
+            value = int(args[0][4:])
+            _print("[" + str(self.TP.num) + "]",
+                   "CLICKED: Sender[" + str(sender) + "], value[" + str(value) + "]")
+            self.dismiss_tooltip()
 
-                conf = False
+            conf = False
+            if sender == "CARD":
+
                 getcard = (next((s for s in self.game_canvas.gettags(tk.CURRENT) if "conf" in s), None))
                 if getcard is not None:
                     if str(self.game_canvas.itemcget(getcard, "activeimage")) == str(self.img_c_over[16]):
@@ -2146,81 +2152,54 @@ class Client(tk.Tk):
                         threading.Thread(target=confirm, args=(getcard,)).start()
                 else:
                     conf = True
-
                 if conf:
-                    self.TP.set_turns('sender', "CARD")
-                    self.TP.set_turns('card', card_num)
+                    print("click card: ", value)
+                    self.TP.set_turns('card', value)
 
-                self.dismiss_tooltip()
-            # endregion
-            # region ###### CLICK @ FIELD ##############################################################################
-            elif self.section_field_y < event.y < self.section_field_y + self.section_field_h:  # map -> find city
+            if sender == "CITY":  # clicked on city
+                self.TP.set_turns('city', value)
+                self.TP.set_turns('steps', len(self.get_player_path(value)))
 
-                sender = str(args[0][:4])
+            if sender == "DIS_":  # clicked on disease-selection
+                self.TP.set_turns('disease', value)
 
-                if sender == "CITY":  # clicked on city
-                    mycitynum = int(args[0][4:])
-                    # mycity = self.city[mycitynum].get("name")
-                    self.TP.set_turns('city', mycitynum)
-                    self.TP.set_turns('steps', len(self.get_player_path(mycitynum)))
+            if sender == "PLAY":  # clicked on player-selection
+                self.TP.set_turns('player', value)
 
-                if sender == "DIS_":  # clicked on disease-selection
-                    self.TP.set_turns('disease', int(args[0][4:]))
+            if sender == "BTN_":  # clicked on in-game-btn (actioncard)
+                if value == 48:
+                    sender = "exec48"
+                if value == 481:
+                    sender = "cancel48"
+                if value == 401:
+                    sender = "choose"
+                    self.TP.set_turns('choose', 401)
+                if value == 402:
+                    sender = "choose"
+                    self.TP.set_turns('choose', 402)
+                if value < 17:  # toolbar
+                    # 2 functions on one button
+                    if value == 12 and self.TP.role != 5:
+                        value = 17
+                    # remove existing highlights -> TODO reduce remove options
+                    self.draw_card_highlight(None)
+                    self.draw_card_highlight()
+                    self.draw_city_highlight()
+                    self.game_canvas.delete("popup")
+                    self.txt_status[1] = ""
 
-                if sender == "PLAY":  # clicked on player-selection
-                    self.TP.set_turns('player', int(args[0][4:]))
-
-                if sender == "BTN_":  # clicked on in-game-btn (actioncard)
-                    if int(args[0][4:]) == 48:
-                        sender = "exec48"
-                    if int(args[0][4:]) == 481:
-                        sender = "cancel48"
-                    if int(args[0][4:]) == 401:
-                        sender = "choose"
-                        self.TP.set_turns('choose', 401)
-                    if int(args[0][4:]) == 402:
-                        sender = "choose"
-                        self.TP.set_turns('choose', 402)
-
-                if sender == "CARD":  # clicked on card on canvas
-                    self.TP.set_turns('card', int(args[0][4:]))
-
-                _print("[" + str(self.TP.num) + "]",
-                       "CLICKED at Field: Sender[" + str(sender) + "], value[" + str(args[0][4:]) + "]")
-
-                self.TP.set_turns('sender', sender)
-            # endregion
-            # region ###### CLICK @ BAR/BTN ############################################################################
-            elif event.y > self.section_toolbar_y:
-                posx = self.game_canvas.coords(tk.CURRENT)[0] + event.widget.winfo_width() / 34
-                num = math.floor(float(posx) / self.section_col1_w * 17)
-
-                # 2 functions on one button
-                if num == 12 and self.TP.role != 5:
-                    num = 17
-
-                _print("[" + str(self.TP.num) + "]",
-                       "CLICKED at BTN: " + str(num))
-
-                # remove existing highlights
-                # TODO reduce remove options
-                self.draw_card_highlight(None)
-                self.draw_card_highlight()
-                self.draw_city_highlight()
-
-                self.game_canvas.delete("popup")
-                self.txt_status[1] = ""
-
-                if (self.TP.turns['LEFT'] > 0 and self.game_STATE == "ACTION") \
-                        or num in [6, 15, 16]:
-                    self.TP.set_turns('turn', num)
-                    self.TP.set_turns('sender', "BTN")
-                else:
-                    if self.TP.turns['LEFT'] <= 0:
-                        self.txt_status[1] = "keine Züge vorhanden"
+                    if (self.TP.turns['LEFT'] > 0 and self.game_STATE == "ACTION") \
+                            or value in [6, 15, 16]:
+                        self.TP.set_turns('turn', value)
                     else:
-                        self.txt_status[1] = "Du bist nicht am Zug."
-            # endregion
+                        if self.TP.turns['LEFT'] <= 0:
+                            self.txt_status[1] = "keine Züge vorhanden"
+                        else:
+                            self.txt_status[1] = "Du bist nicht am Zug."
+
+            # execute
+            if conf or sender != "CARD":
+                self.TP.set_turns('sender', sender)
 
             self._update()
 
@@ -2306,6 +2285,8 @@ class Client(tk.Tk):
                 fill="#000000",
                 anchor=CENTER,
                 font=('Helvetica', fs))
+            self.i_logtext = self.game_canvas.create_text(0, 0, anchor=NW, fill="#FFF", text=self.logtext,
+                                                          tags="side_overlay")
 
             # map
             self.img_map = ImageTk.PhotoImage(
@@ -2421,7 +2402,15 @@ class Client(tk.Tk):
             self.old_window_h = win_h
 
         # update elements
-        self.draw_toolbar("update")
+
+        # update toolbar first as parameters to update will be removed during upate of elements
+        if len(self.gameupdatelist['city']) > 0 or\
+                len(self.gameupdatelist['cards']) > 0 or\
+                self.gameupdatelist['playerpos'] == 1 or\
+                len(self.gameupdatelist['sidebar']) > 0 or\
+                self.gameupdatelist['visual'] or\
+                self.gameupdatelist['exchange']:
+            self.draw_toolbar("update")
 
         # region redraw elements from updatelist
         for c in self.gameupdatelist['city']:
@@ -2688,17 +2677,15 @@ class Client(tk.Tk):
                 # choose card to give or decline (Turn 500)
                 self.TP.cs_reset()
                 self.draw_card_highlight()
-                print(">>> X >>> exchange_card REQUEST s", self.TP.exchange)
                 self.txt_status[1] = str(self.all_player_name[self.TP.exchange['r']]) + \
                                      " möchte eine Karte von dir haben."
                 self.draw_card_highlight(self.city2card(self.check_exchange("send_cards")), "G")
                 # create decline button
                 self.game_canvas.create_image(
-                    self.section_col1_w - math.floor(self.section_toolbar_h) * 13 - 4 + math.floor(self.section_toolbar_h) / 2,
-                    self.section_toolbar_y - 16,
+                    self.carddim("pos", 7),
                     image=self.img_c_over[14],
                     activeimage=self.img_c_over[15],
-                    anchor=S,
+                    anchor=NW,
                     tags=("BTN_500", "popup", "toclick")
                 )
                 self.game_canvas.tag_bind("BTN_500", "<ButtonRelease-1>",
@@ -2707,7 +2694,6 @@ class Client(tk.Tk):
                 self.TP.set_turns('turn', 500)  # create turn 500 (any state) to set card. then execute
 
             elif self.TP.exchange['c'] != 99 and self.TP.num == self.TP.exchange['r']:
-                print(">>> X >>> exchange_card REQUEST r", self.TP.exchange)
                 # everything set, player is receiver
                 # accept or decline card
                 self.TP.cs_reset()
@@ -2725,34 +2711,120 @@ class Client(tk.Tk):
     # endregion
 
     # region ###### DRAW ###############################################################################################
-    # TODO
     def draw_visual(self):
+        # draw:
+        #   M:   - path/movement
+        # txt
+        #   E: epidemie
+        #   O:  - outbreak / follow outbreak
 
-        def draw_path(f, t):
-            tag = "waytag" + str(f) + str(t)
-            self.game_canvas.create_line(
-                int(self.city[f]['X'] * float(int(self.section_col1_w)) / 100),
-                int(self.city[f]['Y'] * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y),
-                int(self.city[t]['X'] * float(int(self.section_col1_w)) / 100),
-                int(self.city[t]['Y'] * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y),
-                fill="#ffaa00", width=2, tags=tag)
+        def draw_path(w):
+            for step in range(1, len(w)):
+                f = w[step-1]
+                t = w[step]
+                tag = "waytag" + str(f) + str(t)
+
+                fx = int(self.city[f]['X'] * float(int(self.section_col1_w)) / 100)
+                fy = int(self.city[f]['Y'] * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                tx = int(self.city[t]['X'] * float(int(self.section_col1_w)) / 100)
+                ty = int(self.city[t]['Y'] * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+
+                if t in self.city[f]['con']:
+                    # walk
+                    # region draw second line when walk around world-edge
+                    if (f == 0 and t == 39) or (f == 39 and t == 0):
+                        fx = int(5.2 * float(int(self.section_col1_w)) / 100)
+                        fy = int(24.4 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        tx = 0
+                        ty = int(22.8 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        self.game_canvas.create_line((fx, fy), (tx, ty), fill="#ffaa00", width=2, tags=tag)
+                        fx = int(self.section_col1_w)
+                        fy = int(24.1 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        tx = int(94.5 * float(int(self.section_col1_w)) / 100)
+                        ty = int(24.3 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                    elif (f == 0 and t == 46) or (f == 46 and t == 0):
+                        fx = int(5.2 * float(int(self.section_col1_w)) / 100)
+                        fy = int(24.4 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        tx = 0
+                        ty = int(27.7 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        self.game_canvas.create_line((fx, fy), (tx, ty), fill="#ffaa00", width=2, tags=tag)
+                        fx = int(self.section_col1_w)
+                        fy = int(57.9 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        tx = int(91.4 * float(int(self.section_col1_w)) / 100)
+                        ty = int(60.6 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                    elif (f == 12 and t == 47) or (f == 47 and t == 12):
+                        fx = int(6.8 * float(int(self.section_col1_w)) / 100)
+                        fy = int(40.1 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        tx = 0
+                        ty = int(47.4 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        self.game_canvas.create_line((fx, fy), (tx, ty), fill="#ffaa00", width=2, tags=tag)
+                        fx = int(self.section_col1_w)
+                        fy = int(89.5 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                        tx = int(95.6 * float(int(self.section_col1_w)) / 100)
+                        ty = int(93.1 * float(int(self.section_col1_w / 2.125) / 100) + self.section_field_y)
+                    # endregion
+                    self.game_canvas.create_line((fx, fy), (tx, ty),
+                                                 fill="#ffaa00", width=2, tags=tag)
+                else:
+                    # fly
+                    d = 40
+                    sx = (fx + tx) / 2 + d * math.sin(math.atan2(ty - fy, tx - fx))
+                    sy = (fy + ty) / 2 - d * math.cos(math.atan2(ty - fy, tx - fx))
+                    self.game_canvas.create_line((fx, fy), (sx, sy), (tx, ty),
+                                                 smooth=True, fill="#ffaa00", width=2, tags=tag)
+                    # flugzeug (icon)
+                    ix = fx / 2 + tx / 2 + d * math.sin(math.atan2(ty - fy, tx - fx)) / 2
+                    iy = fy / 2 + ty / 2 - d * math.cos(math.atan2(ty - fy, tx - fx)) / 2
+                    # prepare flugzeug
+                    s = 320 * self.section_col1_w / (3380 * 2)
+
+                    self.img_flug = ImageTk.PhotoImage(self.img_flug_raw
+                                                       .resize((int(s), int(s)), Image.ANTIALIAS)
+                                                       .rotate(-math.degrees(math.atan2(ty - fy, tx - fx))))
+
+                    self.game_canvas.create_image(ix, iy, image=self.img_flug, anchor=CENTER, tags=tag)
+                    self.game_canvas.coords(self.game_canvas.find_withtag(tag), (ix, iy))
+
+                time.sleep(.25)
+
             time.sleep(5)
-            if self.running:
-                self.game_canvas.delete(tag)
 
+            if self.running:
+                for step in range(1, len(w)):
+                    f = w[step - 1]
+                    t = w[step]
+                    tag = "waytag" + str(f) + str(t)
+                    self.game_canvas.delete(tag)
+
+        def add_logline(txt):
+            newtext = str(txt) + "\n" + self.logtext           # append next line
+            cut = newtext.replace("\n", "xx", 7).find("\n")    # count lines
+
+            if cut > -1:
+                newtext = newtext[:cut - newtext.count("\n") + 1]
+            self.logtext = newtext
+
+        if 'M' in self.visual:  # Draw temporary movement
+            threading.Thread(target=draw_path, args=(self.visual['M'],)).start()
+        if 'E' in self.visual:  # Update logtext
+            add_logline("Epidemie in " + self.city[self.visual['E']]['name'])
+        if 'O' in self.visual:
+
+            for num, o in enumerate(self.visual['O']):
+                if num == 0:
+                    add_logline("Ausbruch in " + self.city[self.visual['O'][0]]['name'])
+                else:
+                    add_logline("Folgeausbruch in " + self.city[self.visual['O'][num]]['name'])
+
+        # update Text
+        self.game_canvas.itemconfigure(self.i_logtext, text=self.logtext)
+
+        # reset update
         self.gameupdatelist['visual'] = 0
 
-        if 'move' in self.visual:
-            print("VISUAL",
-                self.all_player_name[self.visual['move'][0]],
-                  "bewegt sich von",
-                  self.city[self.visual['move'][1]]['name'],
-                  "nach",
-                self.city[self.visual['move'][2]]['name']
-            )
-            # self.logtext(self.city[self.visual['move'][1]]['name'])
-
-            threading.Thread(target=draw_path, args=(self.visual['move'][1], self.visual['move'][2],)).start()
+    def role_update(self):
+        # TODO optional
+        pass
 
 # city
     def draw_cities(self, aw):
@@ -2804,6 +2876,7 @@ class Client(tk.Tk):
                                           anchor=CENTER,
                                           tags=("c" + str(c.get('ID')), "zaeh"))
 
+        self.game_canvas.tag_raise("player")
         self.gameupdatelist['city'] = []
 
     def draw_city_highlight(self, *args):
@@ -2963,6 +3036,11 @@ class Client(tk.Tk):
                     self.img_c1_raw[card].resize(self.carddim("size"), Image.ANTIALIAS))
                 self.game_canvas.create_image(
                     self.carddim("pos", card_in), image=self.img_c1[card], anchor=NW, tags="card" + str(card_in))
+
+                if card > 47:
+                    self.game_canvas.tag_bind("card" + str(card_in), "<Enter>", self.draw_tooltip_action)
+                    self.game_canvas.tag_bind("card" + str(card_in), "<Leave>", self.dismiss_tooltip)
+
             # endregion
 
             # region ###### draw card pile ######
@@ -2974,12 +3052,6 @@ class Client(tk.Tk):
                 self.game_canvas.create_image(
                     self.carddim("pos", 7), image=self.img_c1[self.TP.drawcards[0]], anchor=NW, tags="cards")
 
-                # draw overlay (infect)
-                if self.game_STATE == "INFECT" or self.game_STATE == "EPIDEMIE":
-                    self.img_c2 = ImageTk.PhotoImage(
-                        self.img_c2_raw.resize((self.carddim("size")), Image.ANTIALIAS))
-                    self.game_canvas.create_image(
-                        self.carddim("pos", 7), image=self.img_c2, anchor=NW, tags="cards")
             # draw back
             else:
                 if self.game_STATE == "INFECT":
@@ -3002,17 +3074,18 @@ class Client(tk.Tk):
                                        .resize((int(self.carddim("size")[0] / 2),
                                                 int(self.carddim("size")[1] / 2)),
                                                 Image.ANTIALIAS))
-
                 self.game_canvas.create_image(self.special_val['pos'],
                                               image=self.img_c1[self.special_val['r3']],
                                               anchor=SW,
-                                              tags='role3extra')
+                                              tags="role3card")
+                self.game_canvas.tag_bind("role3card", "<Enter>", self.draw_tooltip_action)
+                self.game_canvas.tag_bind("role3card", "<Leave>", self.dismiss_tooltip)
 
             self.draw_card_highlight()
             self.gameupdatelist['cards'] = []
 
         # draw cards on canvas, action 48 or 8
-        elif card_pos == 8 and card_in != 99:
+        elif card_pos == 8 and card_in != 99:  # TODO doppelte r3 extra
             # remove highlights
             self.draw_card_highlight(None)
             self.dismiss_tooltip()
@@ -3050,11 +3123,12 @@ class Client(tk.Tk):
                 if scale_card:
                     self.img_c1[c] = ImageTk.PhotoImage(self.img_c1_raw[c]
                                                         .resize((int(card_w), int(card_h)), Image.ANTIALIAS))
-                cardtag = "CARD" + str(pos)
+                cardtag = "CARD" + str(c)
                 param = dict(image=self.img_c1[c],
                              anchor=CENTER,
-                             tags=("popup", "popup_high", cardtag, "toclick"))
+                             tags=("popup", "popup_high", cardtag, "toclick", "role3card"))
 
+                print("------------------------------ 2 ------------------------------")
                 self.game_canvas.create_image(self.carddim("overlay", pos),
                                               param)
 
@@ -3072,7 +3146,6 @@ class Client(tk.Tk):
             pos_y = 24  # self.section_card_h + (card_h / 3) - 2
 
             if len(card_in) > 0:
-                # create BG  TODO define in init
                 self.img_sel48bg = ImageTk.PhotoImage(Image.new(
                     'RGBA',
                     (self.carddim("sel48", len(card_in))[0] + 8 - self.carddim("sel48", 0)[0],
@@ -3160,6 +3233,7 @@ class Client(tk.Tk):
         if len(args) == 0:  # region DEFAULT: Draw highlight, depending on state
             self.game_canvas.delete("card_highlight_sel")
             if len(self.TP.drawcards) > 0:
+                cardtag = "CARD7"
                 if self.TP.drawcards[0] == self.card_epidemie \
                         or self.game_STATE == "INFECT" \
                         or self.game_STATE == "EPIDEMIE":
@@ -3169,26 +3243,30 @@ class Client(tk.Tk):
                         image=self.img_c_over[0],
                         activeimage=self.img_c_over[5],
                         anchor=NW,
-                        tags=("card_highlight", "toclick")
+                        tags=("card_highlight", "toclick", cardtag)
                     )
-
+                    self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                              lambda event, tag=cardtag: self.game_click(event, tag))
                 else:
                     self.game_canvas.create_image(
                         self.carddim("high_pos", 7),
                         image=self.img_c_over[2],
                         activeimage=self.img_c_over[4],
                         anchor=NW,
-                        tags=("card_highlight", "toclick", "conf7")
+                        tags=("card_highlight", "toclick", "conf7", cardtag)
                     )
+                    self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                              lambda event, tag=cardtag: self.game_click(event, tag))
                     if self.game_STATE == "SUPPLY" or self.game_STATE == "PASSIV":
                         for bg in range(0, 7):
+                            cardtag = "CARD" + str(bg)
                             if bg < len(self.TP.cards):
                                 self.game_canvas.create_image(
                                     self.carddim("high_pos", bg),
                                     image=self.img_c_over[2],
                                     activeimage=self.img_c_over[3],
                                     anchor=NW,
-                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg), "conf"+str(bg))
+                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg), "conf"+str(bg), cardtag)
                                 )
                             else:
                                 self.game_canvas.create_image(
@@ -3196,12 +3274,13 @@ class Client(tk.Tk):
                                     image=self.img_c_over[0],
                                     activeimage=self.img_c_over[1],
                                     anchor=NW,
-                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg))
+                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg), cardtag)
                                 )
+                            self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                                      lambda event, tag=cardtag: self.game_click(event, tag))
 
                 self.game_canvas.tag_bind("card_highlight", "<Enter>", self.draw_tooltip)
                 self.game_canvas.tag_bind("card_highlight", "<Leave>", self.dismiss_tooltip)
-                self.game_canvas.tag_bind("card_highlight", "<ButtonRelease-1>", self.game_click)
         # endregion
         else:
             if args[0] is None:  # region delete all special highlights when first arg is 'None'
@@ -3210,7 +3289,6 @@ class Client(tk.Tk):
             # endregion
             else:  # region specific changes
                 scolor = {
-                    "R": [2, 7],  # TODO should never happen
                     "G": [0, 6],
                     "H": [6, 7]
                 }
@@ -3222,27 +3300,29 @@ class Client(tk.Tk):
                     param['tags'] = (args[2], "toclick")
                     if args[2] == "actioncard":  # actioncard (small at side)
                         for bg in args[0]:
-                            param['tags'] = param['tags'] + ("cardhigh" + str(bg),)
+                            cardtag = "CARD" + str(bg)
+                            param['tags'] = param['tags'] + ("cardhigh" + str(bg), cardtag,)
                             if bg != 9:
                                 self.game_canvas.create_image(self.carddim("high_pos", bg), param)
                             else:
-                                param['tags'] = (args[2], "toclick")
+                                param['tags'] = (args[2], "toclick", cardtag)
                                 param['image'] = self.img_c_over[9]
                                 param['activeimage'] = self.img_c_over[8]
                                 param['anchor'] = SW
                                 self.game_canvas.create_image(self.special_val['pos'], param)
-                            self.game_canvas.tag_bind("actioncard", "<ButtonRelease-1>",
-                                                      lambda event, t="CARD" + str(bg): self.game_click(event, t))
+                            self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                                      lambda event, t=cardtag: self.game_click(event, t))
                         self.game_canvas.tag_bind("actioncard", "<Enter>", self.draw_tooltip_action)
                         self.game_canvas.tag_bind("actioncard", "<Leave>", self.dismiss_tooltip)
 
                     elif args[2] == "selectactioncard":
                         for bg in args[0]:
-                            param['tags'] = ("CARD"+str(bg), args[2], "toclick", "popup", "cardhigh" + str(bg))
+                            cardtag = "CARD" + str(self.TP.turns['card'][bg])
+                            param['tags'] = (cardtag, args[2], "toclick", "popup", "cardhigh" + str(bg))
                             param['anchor'] = CENTER
                             self.game_canvas.create_image(self.carddim("overlay", bg), param)
-                            self.game_canvas.tag_bind("CARD"+str(bg), "<ButtonRelease-1>",
-                                                      lambda event, t="CARD"+str(bg): self.game_click(event, t))
+                            self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                                      lambda event, t=cardtag: self.game_click(event, t))
 
                             self.game_canvas.tag_bind("CARD"+str(bg), "<Enter>", self.draw_tooltip_action)
                             self.game_canvas.tag_bind("CARD"+str(bg), "<Leave>", self.dismiss_tooltip)
@@ -3253,16 +3333,17 @@ class Client(tk.Tk):
                                                         image=self.img_c_over[scolor.get(args[1])[0]],
                                                         activeimage=self.img_c_over[scolor.get(args[1])[1]]
                                                         )
-                        self.game_canvas.tag_bind("card_highlight_sel", "<ButtonRelease-1>", self.game_click)
+
                     elif args[2] == "select_space":
                         for bg in range(0, 7):
+                            cardtag = "CARD" + str(bg)
                             if bg < len(self.TP.cards):
                                 self.game_canvas.create_image(
                                     self.carddim("high_pos", bg),
                                     image=self.img_c_over[2],
                                     activeimage=self.img_c_over[3],
                                     anchor=NW,
-                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg), "conf"+str(bg))
+                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg), "conf"+str(bg), cardtag)
                                 )
                             else:
                                 self.game_canvas.create_image(
@@ -3270,14 +3351,17 @@ class Client(tk.Tk):
                                     image=self.img_c_over[0],
                                     activeimage=self.img_c_over[1],
                                     anchor=NW,
-                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg))
+                                    tags=("card_highlight", "toclick", "cardhigh"+str(bg), cardtag)
                                 )
-                        self.game_canvas.tag_bind("card_highlight", "<ButtonRelease-1>", self.game_click)
+                        self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                                  lambda event, t=cardtag: self.game_click(event, t))
                 else:
                     for bg in args[0]:
-                        param['tags'] = ("card_highlight_sel", "cardhigh" + str(bg))
+                        cardtag = "CARD" + str(bg)
+                        param['tags'] = ("card_highlight_sel", "cardhigh" + str(bg), cardtag)
                         self.game_canvas.create_image(self.carddim("high_pos", bg), param)
-                    self.game_canvas.tag_bind("card_highlight_sel", "<ButtonRelease-1>", self.game_click)
+                        self.game_canvas.tag_bind(cardtag, "<ButtonRelease-1>",
+                                                  lambda event, t=cardtag: self.game_click(event, t))
 
 # drag and drop
     def dnd_down(self, event, *args):
@@ -3356,19 +3440,20 @@ class Client(tk.Tk):
             #     fill="#282828", outline='#282828', tags="toolbar")
             self.toolbar = []
             for btn in range(0, 17):
-                singletag = "btn_" + str(btn)
+                singletag = "BTN_" + str(btn)
                 self.toolbar.append(self.game_canvas.create_image(
                     # align right and floor value to prevent different spacings
                     self.section_col1_w - math.floor(self.section_toolbar_h) * (17 - btn),
                     self.section_toolbar_y,
                     image=self.img_icon[0][btn],
                     anchor=NW, tags=("toolbar", "btn", singletag)))
+                self.game_canvas.tag_bind(singletag, "<ButtonRelease-1>",
+                                  lambda event, t=singletag: self.game_click(event, t))
                 if btn in {0, 1, 14}:
                     self.game_canvas.delete(singletag)
 
         # customize cards and highlights
 
-        # TODO
         # TODO pos = self.all_player_pos[self.logistician] if self.logistician < 3 else self.TP.pos
         # TODO move_player = self.logistician if self.logistician < 3 else self.TP.num
         if self.current_player == self.TP.num and self.TP.turns['LEFT'] > 0:
@@ -3523,7 +3608,6 @@ class Client(tk.Tk):
 
         check_ico(15, 15, 1)
 
-        self.game_canvas.tag_bind("btn", "<ButtonRelease-1>", self.game_click)
         self.game_canvas.tag_bind("btn", "<Enter>", self.draw_tooltip)
         self.game_canvas.tag_bind("btn", "<Leave>", self.dismiss_tooltip)
 
@@ -3612,6 +3696,17 @@ class Client(tk.Tk):
                             minicard_w,
                             minicard_h),
                     param)
+
+                # special card
+                if self.special_val['r3'] != 0 and self.all_player_role[p[0]] == 3:  # TODO add mouseover
+                    param = dict(fill="#9d3d9e", outline='#222', tags=("toclick", "op", "otherplayercard"))
+                    self.game_canvas.create_rectangle(am_rect(
+                        self.section_col1_w + self.section_side_row_h * 0.5 + 3 - 2 - minicard_w,
+                        r - minicard_w + minicard_h,
+                        minicard_w,
+                        minicard_w),
+                        param)
+
                 # player cards
                 for c in range(0, 7):
                     if len(p[1]) > c:
@@ -3690,7 +3785,9 @@ class Client(tk.Tk):
                     if len(self.game_canvas.find_withtag("sbSI"+str(i))) == 0:  # draw new if nonexistant
                         self.game_canvas.create_rectangle(1, 1, 1, 1, fill=get_inf_color(i), outline='', tags="sbSI"+str(i))
                     self.game_canvas.coords(self.game_canvas.find_withtag("sbSI"+str(i)),
-                                        sidebar_pos(0.5, pos_y + (i * 9/25), (25 - self.infection[i]) * 9 / 25, 9 / 25))
+                                        sidebar_pos(0.5, pos_y + (i * 9/25), (24 - self.infection[i]) * 9 / 25, 9 / 25))
+                else:
+                    self.game_canvas.delete("sbSI"+str(i))
 
         if "SS" in self.gameupdatelist['sidebar']:
             pos_y = 18
@@ -3724,15 +3821,14 @@ class Client(tk.Tk):
 
         # log
         pos_y = 20
-        if len(self.game_canvas.find_withtag("logtext")) == 0:  # draw new if nonexistant
-            self.game_canvas.create_text(
-                sidebar_pos(0.5, pos_y, 1, 1)[0],
-                sidebar_pos(0.5, pos_y, 1, 1)[1],
-                text="",
-                anchor=NW,
-                fill="#FFF",
-                font=('Helvetica', fs-2),
-                tags="logtext")
+        self.game_canvas.itemconfigure(self.i_logtext,
+            anchor=NW,
+            fill="#FFF",
+            text=self.logtext,
+            font=('Helvetica', fs-2))
+        self.game_canvas.coords(self.i_logtext,
+                                sidebar_pos(0.5, pos_y, 1, 1)[0],
+                                sidebar_pos(0.5, pos_y, 1, 1)[1])
 
         # overlay
         self.game_canvas.tag_raise("side_overlay")
@@ -3766,24 +3862,6 @@ class Client(tk.Tk):
         self.gameupdatelist['playerpos'] = 0
 
 # tooltip
-    def logtext(self, *textin):
-
-        if len(textin) > 0:
-
-            for line in range(0, 7):
-                self.logtextcontent[line] = self.logtextcontent[line+1]
-            self.logtextcontent[7] = str(textin[0])
-
-            displaytext = ""
-            for line in range(0, 8):
-                displaytext = displaytext + "\n" + self.logtextcontent[7 - line]
-
-            fs = int((self.section_side_row_h - 6.6475) / 1.4951)
-            if fs > 8:
-                fs = math.floor((fs - 8) / 2 + 8)
-
-            self.game_canvas.itemconfig("logtext", text=displaytext, font=('Helvetica', fs - 2))
-
     def draw_tooltip(self, event):
         if event.y >= self.section_toolbar_y - 3:  # BUTTONS
             posx = self.game_canvas.coords(tk.CURRENT)[0] + event.widget.winfo_width() / 34
@@ -3939,7 +4017,7 @@ class Client(tk.Tk):
                "- Um ein Forschungszentrum zu errichten\n"
                "  brauchst du keine Karte.\n"
                "- Bewege als Aktion (einmal pro Zug)\n"
-               "  deine Figur von einem Forchungszentrum\n"
+               "  deine Figur von einem Forschungszentrum\n"
                "  in eine beliebige Stadt.\n"
                "  Wirf dafür eine beliebige Stadtkarte ab."
         }
@@ -3958,7 +4036,7 @@ class Client(tk.Tk):
             x = self.section_col1_w + self.section_side_row_h/2 - 3
             y = (event.y - event.y % self.section_side_row_h) + self.section_side_row_h / 2
             card_y = math.floor((round(self.game_canvas.coords(tk.CURRENT)[1] / self.section_side_row_h * 2)) / 2 - 1.5)
-            param['anchor'] = E
+            param['anchor'] = NE
             param['text'] = switcher.get(self.all_player_role[self.otherplayer[card_y][0]])
 
         self.game_canvas.itemconfigure(self.i_quicktip, param)
@@ -3975,10 +4053,20 @@ class Client(tk.Tk):
 
         param = dict(fill="white")
 
+        print(card_x)
+
         x = self.game_canvas.coords(tk.CURRENT)[0] + (self.section_side_row_h - 4) / 20 * 7
         y = self.game_canvas.coords(tk.CURRENT)[1] - 5
+
+        if card_x < 0:  # extracard r3
+            cardnum = self.special_val['r3']
+            y = y - (self.section_side_row_h - 4) + (self.section_side_row_h - 4) / 10 * 7
+
+        else:
+            cardnum = self.otherplayer[card_y][1][card_x]
+
         param['anchor'] = S
-        cardnum = self.otherplayer[card_y][1][card_x]
+
         if cardnum < 48:
             param['text'] = self.city[cardnum].get('name')
         else:
